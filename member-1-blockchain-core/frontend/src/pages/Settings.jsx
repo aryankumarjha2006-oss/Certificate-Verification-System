@@ -3,7 +3,7 @@ import { Card, Badge } from '../components/common/Components';
 import { Settings as SettingsIcon, Moon, Sun, Monitor, Bell, Shield, Wallet } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 
-export default function Settings() {
+export default function Settings({ network }) {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
 
   const handleThemeChange = (newTheme) => {
@@ -60,7 +60,7 @@ export default function Settings() {
              <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
                <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Smart Contract Network</div>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <div style={{ fontWeight: 600 }}>Hardhat Localhost (Chain ID: 31337)</div>
+                 <div style={{ fontWeight: 600 }}>{network || 'Not Connected'}</div>
                  <Badge type="success">Active</Badge>
                </div>
              </div>

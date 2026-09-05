@@ -101,7 +101,7 @@ function App() {
               <Route path="/credentials/:id" element={<CredentialDetails />} />
               <Route path="/activity" element={<BlockchainActivityPage />} />
               <Route path="/issuers" element={<Issuers />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<Settings network={network} />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </AppShell>

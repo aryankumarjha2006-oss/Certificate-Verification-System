@@ -38,13 +38,25 @@ class BlockchainService {
     );
 
     const address = await this.signer.getAddress();
-    const network = await this.provider.getNetwork();
 
-    let netName = network.name;
-    if (network.chainId === 31337n) {
-      netName = "Hardhat Local";
-    } else if (netName === "unknown") {
-      netName = "Localhost";
+    let netName = "Unknown Network";
+    try {
+      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = parseInt(chainIdHex, 16);
+
+      if (chainId === 31337) {
+        netName = "Hardhat Local";
+      } else if (chainId === 1) {
+        netName = "Mainnet";
+      } else if (chainId === 1337 || chainId === 1338) {
+        netName = "Localhost";
+      } else {
+        const network = await this.provider.getNetwork();
+        netName = network.name === "unknown" ? `Chain ${chainId}` : network.name;
+      }
+    } catch (e) {
+      const network = await this.provider.getNetwork();
+      netName = network.name === "unknown" ? "Localhost" : network.name;
     }
 
     return {
