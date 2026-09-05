@@ -28,12 +28,16 @@ export default function Institutions() {
       const filter = instReg.filters.InstitutionRegistered();
       const events = await instReg.queryFilter(filter, 0, "latest");
 
-      const loaded = events.map(e => ({
-        id: e.args[0],
-        name: e.args[1],
-        wallet: e.args[2],
-        status: 'ACTIVE'
-      }));
+      const loaded = events.map(e => {
+        const idRaw = e.args[0];
+        const safeId = typeof idRaw === 'string' ? idRaw : (idRaw?.hash || String(idRaw));
+        return {
+          id: safeId,
+          name: e.args[1] || 'Unknown',
+          wallet: e.args[2] || '0x000',
+          status: 'ACTIVE'
+        };
+      });
       setInstitutions(loaded);
     } catch (err) {
       console.error(err);
@@ -69,11 +73,14 @@ export default function Institutions() {
     }
   };
 
-  const filtered = institutions.filter(inst =>
-    inst.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inst.wallet.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = institutions.filter(inst => {
+    const search = (searchTerm || "").toLowerCase();
+    const safeName = (inst.name || "").toLowerCase();
+    const safeId = (inst.id || "").toLowerCase();
+    const safeWallet = (inst.wallet || "").toLowerCase();
+
+    return safeName.includes(search) || safeId.includes(search) || safeWallet.includes(search);
+  });
 
   return (
     <div>

@@ -61,7 +61,30 @@ export function Header({ wallet, network, connect }) {
       <div className="header-right">
         {wallet ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-             <Badge type="success">{network}</Badge>
+             {network === 'Hardhat Local' ? (
+               <Badge type="success">{network}</Badge>
+             ) : (
+               <button
+                 onClick={async () => {
+                   try {
+                     await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x7a69' }] });
+                   } catch (e) {
+                     if (e.code === 4902) {
+                       try {
+                         await window.ethereum.request({
+                           method: 'wallet_addEthereumChain',
+                           params: [{ chainId: '0x7a69', chainName: 'Hardhat Local', rpcUrls: ['http://127.0.0.1:8545'], nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }]
+                         });
+                       } catch (addError) { console.error(addError); }
+                     }
+                   }
+                 }}
+                 className="btn btn-warning"
+                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', cursor: 'pointer' }}
+               >
+                 Switch to Hardhat
+               </button>
+             )}
              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
                <span className="mono" style={{ fontWeight: 500 }}>
                  {wallet.substring(0,6)}...{wallet.substring(38)}

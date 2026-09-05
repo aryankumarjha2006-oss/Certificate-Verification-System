@@ -3,6 +3,7 @@ import { Card, HashDisplay, Badge } from '../components/common/Components';
 import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { useNavigate } from 'react-router-dom';
+import { ethers } from 'ethers';
 
 export default function PublicVerification() {
   const [form, setForm] = useState({ certId: '', hash: '' });
@@ -25,7 +26,7 @@ export default function PublicVerification() {
       if (statusNum === 1 || statusNum === 2 || statusNum === 3 || statusNum === 4) {
           version = await blockchainService.getCertificateVersionCount(form.certId);
           const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-          const certReg = new window.ethers.Contract(certRegAddress, [
+          const certReg = new ethers.Contract(certRegAddress, [
             "function certificates(string) view returns (string, string, address, uint256, uint8, uint256)"
           ], blockchainService.provider);
 

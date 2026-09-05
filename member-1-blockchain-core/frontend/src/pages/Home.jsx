@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Shield, Search, FileCheck, CheckCircle, ArrowRight, ShieldCheck, Database, Layers } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { Badge } from '../components/common/Components';
+import { ethers } from 'ethers';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -13,23 +14,30 @@ export default function Home() {
   React.useEffect(() => {
     const checkStatus = async () => {
       try {
-        if (typeof window.ethereum !== 'undefined') {
-          const provider = new window.ethers.BrowserProvider(window.ethereum);
-          const network = await provider.getNetwork();
-          setNetworkStatus(network.name === 'unknown' ? 'Local Development' : network.name);
+        const provider = blockchainService.provider;
+        const network = await provider.getNetwork();
+        setNetworkStatus(network.name === 'unknown' ? 'Local Development' : network.name);
 
-          const accounts = await provider.listAccounts();
+        if (typeof window.ethereum !== 'undefined') {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum);
+          const accounts = await browserProvider.listAccounts();
           if (accounts.length > 0) {
             setWalletStatus('Connected');
-          }
-
-          if (blockchainService.digitalCredential) {
-            setContractStatus('Available');
           } else {
-            setContractStatus('Unavailable (Connect Wallet)');
+            setWalletStatus('Not Connected');
           }
         } else {
-          setNetworkStatus('No Web3 Provider');
+          setWalletStatus('No Web3 Wallet');
+        }
+
+        if (blockchainService.digitalCredential) {
+          const code = await provider.getCode(blockchainService.digitalCredential.target);
+          if (code !== '0x') {
+            setContractStatus('Available');
+          } else {
+            setContractStatus('Unavailable (Not Deployed)');
+          }
+        } else {
           setContractStatus('Unavailable');
         }
       } catch (err) {

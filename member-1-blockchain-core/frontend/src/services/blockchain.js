@@ -11,10 +11,18 @@ export const CONTRACT_ADDRESSES = {
 
 class BlockchainService {
   constructor() {
-    this.provider = null;
+    this.provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
     this.signer = null;
-    this.digitalCredential = null;
-    this.institutionRegistry = null;
+    this.digitalCredential = new ethers.Contract(
+      CONTRACT_ADDRESSES.digitalCredential,
+      DigitalCredentialABI.abi,
+      this.provider
+    );
+    this.institutionRegistry = new ethers.Contract(
+      CONTRACT_ADDRESSES.institutionRegistry,
+      InstitutionRegistryABI.abi,
+      this.provider
+    );
   }
 
   async connectWallet() {
@@ -73,14 +81,12 @@ class BlockchainService {
   // --- Institution operations ---
   async registerInstitution(id, name, wallet) {
     if (!this.institutionRegistry) throw new Error("Wallet not connected");
-    const tx = await this.institutionRegistry.registerInstitution(id, name, wallet);
-    return await tx.wait();
+    return await this.institutionRegistry.registerInstitution(id, name, wallet);
   }
 
   async authorizeIssuer(instId, issuerWallet) {
     if (!this.institutionRegistry) throw new Error("Wallet not connected");
-    const tx = await this.institutionRegistry.authorizeIssuer(instId, issuerWallet);
-    return await tx.wait();
+    return await this.institutionRegistry.authorizeIssuer(instId, issuerWallet);
   }
 
   async getInstitution(instId) {
@@ -91,8 +97,7 @@ class BlockchainService {
   // --- Certificate operations ---
   async issueCertificate(instId, certId, hash, expiry) {
     if (!this.digitalCredential) throw new Error("Wallet not connected");
-    const tx = await this.digitalCredential.issueCertificate(instId, certId, hash, expiry);
-    return await tx.wait();
+    return await this.digitalCredential.issueCertificate(instId, certId, hash, expiry);
   }
 
   async verifyCertificate(certId, hash) {
@@ -149,14 +154,12 @@ class BlockchainService {
 
   async revokeCertificate(instId, certId) {
     if (!this.digitalCredential) throw new Error("Wallet not connected");
-    const tx = await this.digitalCredential.revokeCertificate(instId, certId);
-    return await tx.wait();
+    return await this.digitalCredential.revokeCertificate(instId, certId);
   }
 
   async createNewVersion(instId, certId, newHash, newExpiry) {
     if (!this.digitalCredential) throw new Error("Wallet not connected");
-    const tx = await this.digitalCredential.createNewVersion(instId, certId, newHash, newExpiry);
-    return await tx.wait();
+    return await this.digitalCredential.createNewVersion(instId, certId, newHash, newExpiry);
   }
 }
 
