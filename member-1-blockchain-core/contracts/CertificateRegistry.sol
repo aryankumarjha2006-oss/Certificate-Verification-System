@@ -21,6 +21,7 @@ contract CertificateRegistry {
         CertificateStatus status;
         uint256 version;
         bool exists;
+        string institutionId;
     }
 
     mapping(string => Certificate) private certificates;
@@ -72,7 +73,8 @@ contract CertificateRegistry {
             expiryTimestamp: _expiryTimestamp,
             status: CertificateStatus.ACTIVE,
             version: 1,
-            exists: true
+            exists: true,
+            institutionId: _institutionId
         });
 
         emit CertificateIssued(_certificateId, _certificateHash, _caller, _expiryTimestamp, 1);
@@ -97,6 +99,7 @@ contract CertificateRegistry {
 
     function revokeCertificate(address _caller, string memory _institutionId, string memory _certificateId) external onlyFacade {
         if (!certificates[_certificateId].exists) revert CertificateDoesNotExist();
+        if (keccak256(bytes(certificates[_certificateId].institutionId)) != keccak256(bytes(_institutionId))) revert UnauthorizedIssuer();
         
         bool isAuthorized = (_caller == certificates[_certificateId].issuer) || institutionRegistry.isAuthorizedIssuer(_institutionId, _caller);
         
@@ -125,6 +128,7 @@ contract CertificateRegistry {
         uint256 _newExpiryTimestamp
     ) external onlyFacade {
         if (!certificates[_certificateId].exists) revert CertificateDoesNotExist();
+        if (keccak256(bytes(certificates[_certificateId].institutionId)) != keccak256(bytes(_institutionId))) revert UnauthorizedIssuer();
         if (!institutionRegistry.isAuthorizedIssuer(_institutionId, _caller)) revert UnauthorizedIssuer();
         if (bytes(_newCertificateHash).length == 0) revert InvalidCertificateData();
 
