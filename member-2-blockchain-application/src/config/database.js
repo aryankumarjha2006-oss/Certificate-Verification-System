@@ -24,8 +24,19 @@ export async function initializeDatabase() {
                     institutionId TEXT,
                     status TEXT
                 )`, (err) => {
-                    if (err) reject(err);
-                    else resolve();
+                    if (err) return reject(err);
+                    
+                    db.run(`CREATE TABLE IF NOT EXISTS verification_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        certificateId TEXT,
+                        timestamp TEXT,
+                        status TEXT,
+                        ipAddress TEXT,
+                        userAgent TEXT
+                    )`, (logErr) => {
+                        if (logErr) reject(logErr);
+                        else resolve();
+                    });
                 });
             }
         });

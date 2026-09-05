@@ -43,13 +43,21 @@ The server will start on `http://localhost:3000`.
 
 ## 📡 API Endpoints
 
+### Authentication
 | Method | Route | Description | Request Payload |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/certificates/issue` | Issues certificate on-chain, saves metadata off-chain, returns QR code. | `multipart/form-data`: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) |
-| `POST` | `/api/certificates/verify` | Hashes uploaded PDF and verifies cryptographic status against blockchain. | `multipart/form-data`: `certificateId`, `pdf` (file) |
-| `POST` | `/api/certificates/revoke` | Submits on-chain revocation transaction. | `application/json`: `{ "institutionId": "...", "certificateId": "..." }` |
-| `POST` | `/api/certificates/version` | Updates certificate hash & increments version on-chain. | `multipart/form-data`: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) |
-| `GET` | `/api/certificates/:id` | Retrieves off-chain certificate metadata. | URL parameter: `id` |
+| `POST` | `/api/auth/login` | Authenticates issuer/admin and returns signed JWT token. | `application/json`: `{ "username": "admin", "password": "..." }` |
+
+### Certificates & Verification
+| Method | Route | Access | Description | Request Payload |
+| :--- | :--- | :--- | :--- | :--- |
+| `POST` | `/api/certificates/issue` | **Protected (JWT)** | Issues certificate on-chain, saves metadata off-chain, returns QR code. | `multipart/form-data`: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) |
+| `POST` | `/api/certificates/revoke` | **Protected (JWT)** | Submits on-chain revocation transaction. | `application/json`: `{ "institutionId": "...", "certificateId": "..." }` |
+| `POST` | `/api/certificates/version` | **Protected (JWT)** | Updates certificate hash & increments version on-chain. | `multipart/form-data`: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) |
+| `POST` | `/api/certificates/verify` | **Public** | Hashes uploaded PDF and verifies cryptographic status against blockchain (logs verification attempt). | `multipart/form-data`: `certificateId`, `pdf` (file) |
+| `GET` | `/api/certificates/:id` | **Public** | Retrieves off-chain certificate metadata. | URL parameter: `id` |
+| `GET` | `/api/certificates/:id/audit` | **Protected (JWT)** | Retrieves audit verification history for a specific certificate ID. | URL parameter: `id` |
+| `GET` | `/api/certificates/audit/all` | **Protected (JWT)** | Retrieves full verification audit history log. | None |
 
 ---
 
