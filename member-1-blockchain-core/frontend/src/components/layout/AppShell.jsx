@@ -1,61 +1,74 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
-import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle } from 'lucide-react';
+import { Badge } from '../common/Components';
 
 export function Sidebar() {
+  const navItems = [
+    { to: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+    { to: "/credentials", icon: FileText, label: "Credentials" },
+    { to: "/institutions", icon: Building2, label: "Institutions" },
+    { to: "/issuers", icon: Users, label: "Issuers" },
+    { to: "/verify", icon: Search, label: "Verification" },
+    { to: "/analytics", icon: BarChart3, label: "Analytics" },
+    { to: "/activity", icon: Activity, label: "Audit Trail" },
+    { to: "/settings", icon: SettingsIcon, label: "Settings" }
+  ];
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <Shield size={24} color="var(--accent)" />
+        <Shield size={24} color="var(--primary)" />
         CredChain
       </div>
       <nav className="sidebar-nav">
-        <NavLink to="/" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`} end>
-          <LayoutDashboard size={18} /> Dashboard
-        </NavLink>
-        <NavLink to="/credentials" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <FileText size={18} /> Credentials
-        </NavLink>
-        <NavLink to="/institutions" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Building2 size={18} /> Institutions
-        </NavLink>
-        <NavLink to="/issuers" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Users size={18} /> Issuers
-        </NavLink>
-        <NavLink to="/verification" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Search size={18} /> Verification
-        </NavLink>
-        <NavLink to="/activity" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <Activity size={18} /> Audit Trail
-        </NavLink>
-        <NavLink to="/settings" className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-          <SettingsIcon size={18} /> Settings
-        </NavLink>
+        {navItems.map((item, idx) => (
+          <NavLink key={idx} to={item.to} className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
+            <item.icon size={18} /> {item.label}
+          </NavLink>
+        ))}
       </nav>
       <div className="sidebar-footer">
-        <div style={{fontSize: '0.8rem', color: 'var(--text-muted)'}}>Network</div>
-        <div style={{fontWeight: '500'}}>Local Development</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }}></div>
+          <span style={{ color: 'var(--text-muted)' }}>Local Development</span>
+        </div>
       </div>
     </aside>
   );
 }
 
 export function Header({ wallet, network, connect }) {
+  const [copied, setCopied] = React.useState(false);
+  const navigate = useNavigate();
+
+  const handleCopy = () => {
+    if (wallet) {
+      navigator.clipboard.writeText(wallet);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
     <header className="header">
       <div className="header-left">
-        {/* Search placeholder */}
-        <div style={{display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '300px'}}>
-          <Search size={16} style={{marginRight: '0.5rem'}} />
-          <span style={{fontSize: '0.9rem'}}>Search credentials...</span>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '300px', border: '1px solid var(--border)' }}>
+          <Search size={16} style={{ marginRight: '0.5rem' }} />
+          <span style={{ fontSize: '0.9rem' }}>Global Search...</span>
         </div>
       </div>
       <div className="header-right">
         {wallet ? (
-          <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-             <div className="badge badge-success" style={{textTransform: 'none'}}>{network}</div>
-             <div className="mono" style={{background: 'var(--bg-main)', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-md)', fontWeight: 500}}>
-               {wallet.substring(0,6)}...{wallet.substring(38)}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+             <Badge type="success">{network}</Badge>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+               <span className="mono" style={{ fontWeight: 500 }}>
+                 {wallet.substring(0,6)}...{wallet.substring(38)}
+               </span>
+               <button onClick={handleCopy} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)' }}>
+                 {copied ? <CheckCircle size={14} color="var(--success)" /> : <Copy size={14} />}
+               </button>
              </div>
           </div>
         ) : (

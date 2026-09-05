@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Institutions from './pages/Institutions';
 import Certificates from './pages/Certificates';
 import BlockchainActivityPage from './pages/BlockchainActivityPage';
+import PublicVerification from './pages/PublicVerification';
+import CredentialDetails from './pages/CredentialDetails';
+import Analytics from './pages/Analytics';
+import Issuers from './pages/Issuers';
+import Settings from './pages/Settings';
+import LoadingScreen from './components/common/LoadingScreen';
 import { blockchainService } from './services/blockchain';
 
 import './styles/tokens.css';
@@ -15,6 +22,7 @@ function App() {
   const [wallet, setWallet] = useState(null);
   const [network, setNetwork] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -33,24 +41,44 @@ function App() {
   };
 
   useEffect(() => {
-    if (window.ethereum && window.ethereum.selectedAddress) {
-      connect();
-    }
+    const init = async () => {
+      if (window.ethereum && window.ethereum.selectedAddress) {
+        try {
+          await connect();
+        } catch (e) {
+          // silent fail for init
+        }
+      }
+      setTimeout(() => setIsInitializing(false), 2600); // allow loading screen to show animation
+    };
+    init();
   }, []);
+
+  if (isInitializing) {
+    return <LoadingScreen />;
+  }
 
   return (
     <Router>
-      <AppShell wallet={wallet} network={network} connect={connect}>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/institutions" element={<Institutions />} />
-          <Route path="/credentials" element={<Certificates />} />
-          <Route path="/activity" element={<BlockchainActivityPage />} />
-          <Route path="/issuers" element={<div className="page-header"><h1 className="page-title">Issuers</h1><p className="page-subtitle">Issuer management has been moved here.</p></div>} />
-          <Route path="/verification" element={<div className="page-header"><h1 className="page-title">Verification</h1></div>} />
-          <Route path="/settings" element={<div className="page-header"><h1 className="page-title">Settings</h1></div>} />
-        </Routes>
-      </AppShell>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/verify" element={<PublicVerification />} />
+        <Route path="/*" element={
+          <AppShell wallet={wallet} network={network} connect={connect}>
+            <Routes>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/institutions" element={<Institutions />} />
+              <Route path="/credentials" element={<Certificates />} />
+              <Route path="/credentials/:id" element={<CredentialDetails />} />
+              <Route path="/activity" element={<BlockchainActivityPage />} />
+              <Route path="/issuers" element={<Issuers />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </AppShell>
+        } />
+      </Routes>
     </Router>
   );
 }

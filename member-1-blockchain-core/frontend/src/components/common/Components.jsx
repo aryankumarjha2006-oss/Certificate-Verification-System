@@ -28,7 +28,7 @@ export function Badge({ children, type = "neutral" }) {
 
 export function HashDisplay({ value }) {
   const [copied, setCopied] = React.useState(false);
-  
+
   const handleCopy = () => {
     navigator.clipboard.writeText(value);
     setCopied(true);
@@ -51,7 +51,7 @@ export function HashDisplay({ value }) {
 
 export function Modal({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
-  
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>

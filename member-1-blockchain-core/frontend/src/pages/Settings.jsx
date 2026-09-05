@@ -1,99 +1,88 @@
-import React from 'react';
-import { Card, Badge, HashDisplay } from '../components/common/Components';
-import { Shield, Settings as SettingsIcon, Link as LinkIcon, Database } from 'lucide-react';
+import React, { useState } from 'react';
+import { Card, Badge } from '../components/common/Components';
+import { Settings as SettingsIcon, Moon, Sun, Monitor, Bell, Shield, Wallet } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 
 export default function Settings() {
-  const [theme, setTheme] = React.useState(localStorage.getItem('theme') || 'light');
-  
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  const handleThemeChange = (newTheme) => {
+    setTheme(newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Platform Settings</h1>
-        <p className="page-subtitle">Configure network, security, and appearance.</p>
+        <h1 className="page-title">Settings</h1>
+        <p className="page-subtitle">Manage application preferences and security settings.</p>
       </div>
 
-      <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem'}}>
-        
-        <Card title={
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-            <LinkIcon size={18} /> Network Configuration
-          </div>
-        }>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-             <div>
-               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>RPC Node URL</div>
-               <div className="mono" style={{background: 'var(--bg-main)', padding: '0.5rem', borderRadius: 'var(--radius-sm)'}}>http://127.0.0.1:8545</div>
-             </div>
-             <div>
-               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>Network Name</div>
-               <div className="mono" style={{background: 'var(--bg-main)', padding: '0.5rem', borderRadius: 'var(--radius-sm)'}}>Localhost</div>
-             </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Monitor size={18}/> Appearance</div>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div>
+              <label style={{ display: 'block', fontWeight: 500, marginBottom: '0.75rem' }}>Theme Preference</label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <button
+                  className={`btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handleThemeChange('light')}
+                  style={{ flex: 1 }}
+                >
+                  <Sun size={18} /> Light Mode
+                </button>
+                <button
+                  className={`btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => handleThemeChange('dark')}
+                  style={{ flex: 1 }}
+                >
+                  <Moon size={18} /> Dark Mode
+                </button>
+              </div>
+            </div>
+
+            <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Bell size={20} color="var(--text-muted)" />
+                  <span style={{ fontWeight: 500 }}>Browser Notifications</span>
+                </div>
+                <Badge type="neutral">Disabled</Badge>
+              </div>
+              <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>Get notified when a blockchain transaction is confirmed.</p>
+            </div>
           </div>
         </Card>
 
-        <Card title={
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-            <Database size={18} /> Contract Addresses
-          </div>
-        }>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-             <div>
-               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>Digital Credential (Facade)</div>
-               <HashDisplay value={blockchainService.digitalCredential?.target || "Not Connected"} />
+        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Shield size={18}/> Security & Network</div>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+               <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Smart Contract Network</div>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div style={{ fontWeight: 600 }}>Hardhat Localhost (Chain ID: 31337)</div>
+                 <Badge type="success">Active</Badge>
+               </div>
              </div>
-             <div>
-               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem'}}>Institution Registry</div>
-               <HashDisplay value={blockchainService.institutionRegistry?.target || "Not Connected"} />
+
+             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+               <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connected Wallet</div>
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 {blockchainService.provider ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Wallet size={16} color="var(--primary)" />
+                      <span className="mono" style={{ fontWeight: 600 }}>Connected</span>
+                    </div>
+                 ) : (
+                    <div style={{ fontWeight: 600, color: 'var(--warning)' }}>Not Connected</div>
+                 )}
+               </div>
+               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                 CredChain uses Web3 Provider injection (e.g. MetaMask). Network switching must be done within your wallet extension.
+               </p>
              </div>
           </div>
         </Card>
-
-        <Card title={
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-            <Shield size={18} /> Security & Trust
-          </div>
-        }>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-               <span>Wallet Signing</span>
-               <Badge type="success">✓ Enabled</Badge>
-             </div>
-             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-               <span>Private Key Storage</span>
-               <Badge type="success">✓ Never Stored</Badge>
-             </div>
-             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-               <span>Blockchain Verification</span>
-               <Badge type="success">✓ Deterministic</Badge>
-             </div>
-             
-             <p style={{fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem'}}>
-               Transactions are signed through your connected wallet locally. This application never requests or stores your private key.
-             </p>
-          </div>
-        </Card>
-
-        <Card title={
-          <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
-            <SettingsIcon size={18} /> Appearance
-          </div>
-        }>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-             <span>Dark Mode</span>
-             <button className="btn btn-secondary" onClick={toggleTheme}>
-               {theme === 'dark' ? 'Disable' : 'Enable'}
-             </button>
-          </div>
-        </Card>
-
       </div>
     </div>
   );

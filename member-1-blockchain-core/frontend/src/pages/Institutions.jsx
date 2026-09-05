@@ -1,100 +1,163 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Badge, HashDisplay, Modal } from '../components/common/Components';
-import { Plus, Building2 } from 'lucide-react';
+import { Card, Badge, Modal } from '../components/common/Components';
+import { LoadingState, EmptyState, TransactionStatus, Toast } from '../components/common/UIStates';
+import { Plus, Search, Building2 } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { ethers } from 'ethers';
 
 export default function Institutions() {
-  const [events, setEvents] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ id: '', name: '', wallet: '' });
-  const [status, setStatus] = useState('');
-  
+  const [institutions, setInstitutions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const [txStatus, setTxStatus] = useState(null);
+  const [txHash, setTxHash] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({ id: '', name: '', wallet: '' });
+
   useEffect(() => {
-    loadEvents();
+    loadInstitutions();
   }, [blockchainService.provider]);
 
-  const loadEvents = async () => {
-    if (!blockchainService.provider) return;
+  const loadInstitutions = async () => {
     try {
-      const filter = blockchainService.institutionRegistry.filters.InstitutionRegistered();
-      const rawEvents = await blockchainService.institutionRegistry.queryFilter(filter, 0, "latest");
-      const list = await Promise.all(rawEvents.map(async (e) => {
-        const details = await blockchainService.institutionRegistry.getInstitution(e.args[0]);
-        return { id: e.args[0], name: e.args[1], wallet: e.args[2], active: details.isActive };
+      if (!blockchainService.provider) return;
+      setLoading(true);
+      const instReg = blockchainService.institutionRegistry;
+      const filter = instReg.filters.InstitutionRegistered();
+      const events = await instReg.queryFilter(filter, 0, "latest");
+
+      const loaded = events.map(e => ({
+        id: e.args[0],
+        name: e.args[1],
+        wallet: e.args[2],
+        status: 'ACTIVE'
       }));
-      setEvents(list);
-    } catch (e) {
-      console.error(e);
+      setInstitutions(loaded);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      setStatus('Registering...');
-      await blockchainService.registerInstitution(form.id, form.name, form.wallet);
-      setStatus('Success');
-      setTimeout(() => { setShowModal(false); loadEvents(); setStatus(''); }, 2000);
+      setTxStatus('waiting-wallet');
+      setIsModalOpen(false);
+
+      const tx = await blockchainService.registerInstitution(formData.id, formData.name, formData.wallet);
+
+      setTxStatus('submitted');
+      setTxHash(tx.hash);
+
+      await tx.wait();
+      setTxStatus('confirmed');
+
+      setToast({
+        type: 'success',
+        title: 'Institution Registered',
+        message: `${formData.name} (${formData.id}) has been registered.`
+      });
+
+      loadInstitutions();
     } catch (err) {
-      setStatus(`Error: ${err.message}`);
+      console.error(err);
+      setTxStatus('error');
     }
   };
 
+  const filtered = institutions.filter(inst =>
+    inst.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inst.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inst.wallet.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div>
-      <div className="page-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">Trusted Institutions</h1>
-          <p className="page-subtitle">Manage registered educational institutions on the blockchain.</p>
+          <p className="page-subtitle">Manage accredited organizations capable of issuing credentials.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> Register Institution
+        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+          <Plus size={18} /> Register Institution
         </button>
       </div>
 
+      {toast && <Toast title={toast.title} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      <TransactionStatus status={txStatus} hash={txHash} onClose={() => { setTxStatus(null); setTxHash(null); }} />
+
       <Card>
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Institution ID</th>
-                <th>Name</th>
-                <th>Authority Wallet</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.length === 0 && <tr><td colSpan="4" style={{textAlign: 'center', padding: '2rem'}}>No institutions found</td></tr>}
-              {events.map((e, idx) => (
-                <tr key={idx}>
-                  <td style={{fontWeight: 500}}>{e.id}</td>
-                  <td>{e.name}</td>
-                  <td><HashDisplay value={e.wallet} /></td>
-                  <td><Badge type={e.active ? "success" : "danger"}>{e.active ? "Active" : "Inactive"}</Badge></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search institutions..."
+              className="form-input"
+              style={{ width: '100%', paddingLeft: '2.5rem' }}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
         </div>
+
+        {loading ? (
+          <LoadingState message="Loading institutions from blockchain..." />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+             icon={Building2}
+             title="No Institutions Found"
+             description="There are no institutions matching your criteria."
+             action={<button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>Register Institution</button>}
+          />
+        ) : (
+          <div className="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Institution ID</th>
+                  <th>Name</th>
+                  <th>Wallet Address</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((inst, idx) => (
+                  <tr key={idx}>
+                    <td style={{ fontWeight: 500 }}>{inst.id}</td>
+                    <td>{inst.name}</td>
+                    <td className="mono" style={{ fontSize: '0.85rem' }}>{inst.wallet}</td>
+                    <td><Badge type="success">{inst.status}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Register Institution">
-        {status && <div className={status === 'Success' ? 'badge badge-success' : 'badge badge-danger'} style={{marginBottom: '1rem', width: '100%', padding: '1rem', boxSizing: 'border-box'}}>{status}</div>}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Register Institution">
         <form onSubmit={handleRegister}>
           <div className="form-group">
-            <label className="form-label">Institution ID (e.g., INST-001)</label>
-            <input className="form-input" required value={form.id} onChange={e => setForm({...form, id: e.target.value})} />
+            <label className="form-label">Institution ID</label>
+            <input className="form-input" required value={formData.id} onChange={e => setFormData({...formData, id: e.target.value})} placeholder="e.g. INST-001" />
           </div>
           <div className="form-group">
             <label className="form-label">Institution Name</label>
-            <input className="form-input" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+            <input className="form-input" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="e.g. Global Tech University" />
           </div>
           <div className="form-group">
-            <label className="form-label">Authority Wallet Address (0x...)</label>
-            <input className="form-input" required value={form.wallet} onChange={e => setForm({...form, wallet: e.target.value})} />
+            <label className="form-label">Admin Wallet Address</label>
+            <input className="form-input mono" required value={formData.wallet} onChange={e => setFormData({...formData, wallet: e.target.value})} placeholder="0x..." />
           </div>
-          <button type="submit" className="btn btn-primary" style={{width: '100%', marginTop: '1rem'}}>Confirm Registration</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Register on Blockchain</button>
+          </div>
         </form>
       </Modal>
     </div>

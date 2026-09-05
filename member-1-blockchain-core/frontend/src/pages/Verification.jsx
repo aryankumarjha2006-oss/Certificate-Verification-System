@@ -13,19 +13,19 @@ export default function Verification() {
     try {
       setLoading(true);
       setResult(null);
-      
+
       const statusNum = await blockchainService.verifyCertificate(form.certId, form.hash);
       const statuses = ["NOT_FOUND", "VALID", "TAMPERED", "REVOKED", "EXPIRED"];
       const statusText = statuses[statusNum];
-      
+
       // Get additional info if valid
       let version = "-";
       if (statusNum === 1) { // VALID
           version = await blockchainService.getCertificateVersionCount(form.certId);
       }
-      
+
       setResult({ status: statusText, version: version?.toString() || "-" });
-      
+
     } catch (err) {
       console.error(err);
       setResult({ status: "ERROR", message: err.message });
@@ -36,48 +36,48 @@ export default function Verification() {
 
   const getStatusDisplay = () => {
     if (!result) return null;
-    
+
     const displays = {
-      VALID: { 
-        icon: <CheckCircle size={48} color="var(--success)" />, 
-        title: "Credential Verified", 
+      VALID: {
+        icon: <CheckCircle size={48} color="var(--success)" />,
+        title: "Credential Verified",
         desc: "Blockchain proof matches the submitted credential exactly.",
-        color: "var(--success)", bg: "var(--success-bg)" 
+        color: "var(--success)", bg: "var(--success-bg)"
       },
-      TAMPERED: { 
-        icon: <AlertTriangle size={48} color="var(--warning)" />, 
-        title: "Integrity Check Failed", 
+      TAMPERED: {
+        icon: <AlertTriangle size={48} color="var(--warning)" />,
+        title: "Integrity Check Failed",
         desc: "The submitted credential hash does not match the blockchain record.",
-        color: "var(--warning)", bg: "var(--warning-bg)" 
+        color: "var(--warning)", bg: "var(--warning-bg)"
       },
-      REVOKED: { 
-        icon: <XCircle size={48} color="var(--danger)" />, 
-        title: "Credential Revoked", 
+      REVOKED: {
+        icon: <XCircle size={48} color="var(--danger)" />,
+        title: "Credential Revoked",
         desc: "This credential has been permanently revoked by an authorized issuer.",
-        color: "var(--danger)", bg: "var(--danger-bg)" 
+        color: "var(--danger)", bg: "var(--danger-bg)"
       },
-      EXPIRED: { 
-        icon: <Clock size={48} color="var(--warning)" />, 
-        title: "Credential Expired", 
+      EXPIRED: {
+        icon: <Clock size={48} color="var(--warning)" />,
+        title: "Credential Expired",
         desc: "This credential is no longer within its validity period.",
-        color: "var(--warning)", bg: "var(--warning-bg)" 
+        color: "var(--warning)", bg: "var(--warning-bg)"
       },
-      NOT_FOUND: { 
-        icon: <Search size={48} color="var(--text-muted)" />, 
-        title: "Credential Not Found", 
+      NOT_FOUND: {
+        icon: <Search size={48} color="var(--text-muted)" />,
+        title: "Credential Not Found",
         desc: "No trusted blockchain record exists for this credential.",
-        color: "var(--text-muted)", bg: "var(--border-subtle)" 
+        color: "var(--text-muted)", bg: "var(--border-subtle)"
       }
     };
-    
+
     const d = displays[result.status] || displays.NOT_FOUND;
-    
+
     return (
       <div style={{marginTop: '2rem', padding: '2rem', borderRadius: 'var(--radius-lg)', background: d.bg, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', border: `1px solid ${d.color}`}}>
         <div style={{marginBottom: '1rem'}}>{d.icon}</div>
         <h2 style={{color: d.color, margin: '0 0 0.5rem 0'}}>{d.title}</h2>
         <p style={{color: 'var(--text-main)', margin: 0, opacity: 0.9}}>{d.desc}</p>
-        
+
         {result.status === "VALID" && (
           <div style={{marginTop: '2rem', width: '100%', maxWidth: '400px', background: 'var(--bg-card)', padding: '1.5rem', borderRadius: 'var(--radius-md)', textAlign: 'left'}}>
              <h4 style={{margin: '0 0 1rem 0', color: 'var(--text-muted)'}}>Trust Summary</h4>
@@ -114,7 +114,7 @@ export default function Verification() {
           </button>
         </form>
       </Card>
-      
+
       {getStatusDisplay()}
     </div>
   );
