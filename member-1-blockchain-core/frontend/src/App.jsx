@@ -1,35 +1,56 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { AppShell } from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import Institutions from './pages/Institutions';
 import Certificates from './pages/Certificates';
 import BlockchainActivityPage from './pages/BlockchainActivityPage';
-import WalletConnect from './components/WalletConnect';
-import './App.css';
+import { blockchainService } from './services/blockchain';
+
+import './styles/tokens.css';
+import './styles/layout.css';
+import './styles/components.css';
 
 function App() {
+  const [wallet, setWallet] = useState(null);
+  const [network, setNetwork] = useState(null);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const connect = async () => {
+    try {
+      const data = await blockchainService.connectWallet();
+      setWallet(data.address);
+      setNetwork(data.network);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect wallet. Ensure MetaMask is installed and on the correct network.");
+    }
+  };
+
+  useEffect(() => {
+    if (window.ethereum && window.ethereum.selectedAddress) {
+      connect();
+    }
+  }, []);
+
   return (
     <Router>
-      <div className="app-container">
-        <nav className="navbar">
-          <div className="navbar-brand">Member 1 Blockchain Admin</div>
-          <div className="navbar-links">
-            <Link to="/">Dashboard</Link>
-            <Link to="/institutions">Institutions</Link>
-            <Link to="/certificates">Certificates</Link>
-            <Link to="/activity">Activity</Link>
-          </div>
-          <WalletConnect />
-        </nav>
-        <main className="main-content">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/institutions" element={<Institutions />} />
-            <Route path="/certificates" element={<Certificates />} />
-            <Route path="/activity" element={<BlockchainActivityPage />} />
-          </Routes>
-        </main>
-      </div>
+      <AppShell wallet={wallet} network={network} connect={connect}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/institutions" element={<Institutions />} />
+          <Route path="/credentials" element={<Certificates />} />
+          <Route path="/activity" element={<BlockchainActivityPage />} />
+          <Route path="/issuers" element={<div className="page-header"><h1 className="page-title">Issuers</h1><p className="page-subtitle">Issuer management has been moved here.</p></div>} />
+          <Route path="/verification" element={<div className="page-header"><h1 className="page-title">Verification</h1></div>} />
+          <Route path="/settings" element={<div className="page-header"><h1 className="page-title">Settings</h1></div>} />
+        </Routes>
+      </AppShell>
     </Router>
   );
 }

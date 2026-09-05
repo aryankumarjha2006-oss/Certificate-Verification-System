@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, HashDisplay, Modal } from '../components/common/Components';
-import { Plus, Building2 } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { ethers } from 'ethers';
 
-export default function Institutions() {
+export default function Issuers() {
   const [events, setEvents] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ id: '', name: '', wallet: '' });
+  const [form, setForm] = useState({ instId: '', wallet: '' });
   const [status, setStatus] = useState('');
   
   useEffect(() => {
@@ -17,23 +16,31 @@ export default function Institutions() {
   const loadEvents = async () => {
     if (!blockchainService.provider) return;
     try {
-      const filter = blockchainService.institutionRegistry.filters.InstitutionRegistered();
-      const rawEvents = await blockchainService.institutionRegistry.queryFilter(filter, 0, "latest");
+      const authFilter = blockchainService.institutionRegistry.filters.IssuerAuthorized();
+      const rawEvents = await blockchainService.institutionRegistry.queryFilter(authFilter, 0, "latest");
+      
       const list = await Promise.all(rawEvents.map(async (e) => {
-        const details = await blockchainService.institutionRegistry.getInstitution(e.args[0]);
-        return { id: e.args[0], name: e.args[1], wallet: e.args[2], active: details.isActive };
+        const isAuth = await blockchainService.institutionRegistry.isAuthorizedIssuer(e.args[0], e.args[1]);
+        return { instId: e.args[0], wallet: e.args[1], active: isAuth };
       }));
-      setEvents(list);
+      
+      // Deduplicate by instId + wallet to show current status
+      const uniqueMap = new Map();
+      list.forEach(item => {
+         uniqueMap.set(`${item.instId}-${item.wallet}`, item);
+      });
+      
+      setEvents(Array.from(uniqueMap.values()));
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleRegister = async (e) => {
+  const handleAuthorize = async (e) => {
     e.preventDefault();
     try {
-      setStatus('Registering...');
-      await blockchainService.registerInstitution(form.id, form.name, form.wallet);
+      setStatus('Authorizing...');
+      await blockchainService.authorizeIssuer(form.instId, form.wallet);
       setStatus('Success');
       setTimeout(() => { setShowModal(false); loadEvents(); setStatus(''); }, 2000);
     } catch (err) {
@@ -45,11 +52,11 @@ export default function Institutions() {
     <div>
       <div className="page-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'}}>
         <div>
-          <h1 className="page-title">Trusted Institutions</h1>
-          <p className="page-subtitle">Manage registered educational institutions on the blockchain.</p>
+          <h1 className="page-title">Trusted Issuers</h1>
+          <p className="page-subtitle">Manage blockchain authorities permitted to issue credentials.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
-          <Plus size={16} /> Register Institution
+          <Plus size={16} /> Authorize Issuer
         </button>
       </div>
 
@@ -59,19 +66,17 @@ export default function Institutions() {
             <thead>
               <tr>
                 <th>Institution ID</th>
-                <th>Name</th>
-                <th>Authority Wallet</th>
-                <th>Status</th>
+                <th>Issuer Wallet</th>
+                <th>Authorization Status</th>
               </tr>
             </thead>
             <tbody>
-              {events.length === 0 && <tr><td colSpan="4" style={{textAlign: 'center', padding: '2rem'}}>No institutions found</td></tr>}
+              {events.length === 0 && <tr><td colSpan="3" style={{textAlign: 'center', padding: '2rem'}}>No issuers found</td></tr>}
               {events.map((e, idx) => (
                 <tr key={idx}>
-                  <td style={{fontWeight: 500}}>{e.id}</td>
-                  <td>{e.name}</td>
+                  <td style={{fontWeight: 500}}>{e.instId}</td>
                   <td><HashDisplay value={e.wallet} /></td>
-                  <td><Badge type={e.active ? "success" : "danger"}>{e.active ? "Active" : "Inactive"}</Badge></td>
+                  <td><Badge type={e.active ? "success" : "danger"}>{e.active ? "Authorized" : "Revoked"}</Badge></td>
                 </tr>
               ))}
             </tbody>
@@ -79,22 +84,18 @@ export default function Institutions() {
         </div>
       </Card>
 
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Register Institution">
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Authorize New Issuer">
         {status && <div className={status === 'Success' ? 'badge badge-success' : 'badge badge-danger'} style={{marginBottom: '1rem', width: '100%', padding: '1rem', boxSizing: 'border-box'}}>{status}</div>}
-        <form onSubmit={handleRegister}>
+        <form onSubmit={handleAuthorize}>
           <div className="form-group">
             <label className="form-label">Institution ID (e.g., INST-001)</label>
-            <input className="form-input" required value={form.id} onChange={e => setForm({...form, id: e.target.value})} />
+            <input className="form-input" required value={form.instId} onChange={e => setForm({...form, instId: e.target.value})} />
           </div>
           <div className="form-group">
-            <label className="form-label">Institution Name</label>
-            <input className="form-input" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Authority Wallet Address (0x...)</label>
+            <label className="form-label">Issuer Wallet Address (0x...)</label>
             <input className="form-input" required value={form.wallet} onChange={e => setForm({...form, wallet: e.target.value})} />
           </div>
-          <button type="submit" className="btn btn-primary" style={{width: '100%', marginTop: '1rem'}}>Confirm Registration</button>
+          <button type="submit" className="btn btn-primary" style={{width: '100%', marginTop: '1rem'}}>Confirm Authorization</button>
         </form>
       </Modal>
     </div>

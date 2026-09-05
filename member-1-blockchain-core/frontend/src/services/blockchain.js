@@ -96,6 +96,38 @@ class BlockchainService {
     return await this.digitalCredential.getCertificateVersionCount(certId);
   }
 
+  // Event parsing for Dashboard
+  async getAllEvents() {
+    if (!this.provider || !this.digitalCredential) return { certEvents: [], instEvents: [] };
+    const certRegAddress = await this.digitalCredential.certificateRegistry();
+    const certReg = new ethers.Contract(certRegAddress, [
+      "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
+      "event CertificateRevoked(string indexed certificateId)",
+      "event CertificateVersionCreated(string indexed certificateId, string newCertificateHash, uint256 newExpiryTimestamp, uint256 newVersion)"
+    ], this.provider);
+    
+    const instEventsFilter = this.institutionRegistry.filters.InstitutionRegistered();
+    const instEvents = await this.institutionRegistry.queryFilter(instEventsFilter, 0, "latest");
+    
+    const certIssuedFilter = certReg.filters.CertificateIssued();
+    const certRevokedFilter = certReg.filters.CertificateRevoked();
+    
+    const issuedEvents = await certReg.queryFilter(certIssuedFilter, 0, "latest");
+    const revokedEvents = await certReg.queryFilter(certRevokedFilter, 0, "latest");
+    
+    return {
+       issued: issuedEvents.map(e => ({
+           certId: e.args[0],
+           issuer: e.args[2],
+           timestamp: e.args[3]
+       })),
+       revoked: revokedEvents.map(e => ({
+           certId: e.args[0]
+       })),
+       institutions: instEvents.length
+    };
+  }
+
   async revokeCertificate(instId, certId) {
     if (!this.digitalCredential) throw new Error("Wallet not connected");
     const tx = await this.digitalCredential.revokeCertificate(instId, certId);
