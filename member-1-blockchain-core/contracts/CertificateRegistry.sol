@@ -24,6 +24,7 @@ contract CertificateRegistry {
     }
 
     mapping(string => Certificate) private certificates;
+    mapping(string => mapping(uint256 => Certificate)) private certificateVersions;
     InstitutionRegistry public institutionRegistry;
     address public facadeAddress;
 
@@ -64,7 +65,7 @@ contract CertificateRegistry {
         if (bytes(_certificateId).length == 0 || bytes(_certificateHash).length == 0) revert InvalidCertificateData();
         if (certificates[_certificateId].exists) revert CertificateAlreadyExists();
 
-        certificates[_certificateId] = Certificate({
+        Certificate memory newCert = Certificate({
             certificateId: _certificateId,
             certificateHash: _certificateHash,
             issuer: _caller,
@@ -74,6 +75,8 @@ contract CertificateRegistry {
             version: 1,
             exists: true
         });
+        certificates[_certificateId] = newCert;
+        certificateVersions[_certificateId][1] = newCert;
 
         emit CertificateIssued(_certificateId, _certificateHash, _caller, _expiryTimestamp, 1);
     }
@@ -134,6 +137,23 @@ contract CertificateRegistry {
         cert.version += 1;
         cert.issueTimestamp = block.timestamp;
 
+        certificateVersions[_certificateId][cert.version] = cert;
+
         emit CertificateVersionCreated(_certificateId, _newCertificateHash, _newExpiryTimestamp, cert.version);
+    }
+
+    function getCertificateVersion(string memory _certificateId, uint256 _version) external view returns (Certificate memory) {
+        Certificate memory cert = certificateVersions[_certificateId][_version];
+        if (!cert.exists) revert CertificateDoesNotExist();
+        
+        if (certificates[_certificateId].status == CertificateStatus.REVOKED) {
+            cert.status = CertificateStatus.REVOKED;
+        }
+        return cert;
+    }
+
+    function getCertificateVersionCount(string memory _certificateId) external view returns (uint256) {
+        if (!certificates[_certificateId].exists) revert CertificateDoesNotExist();
+        return certificates[_certificateId].version;
     }
 }
