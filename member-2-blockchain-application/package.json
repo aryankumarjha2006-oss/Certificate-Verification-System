@@ -1,0 +1,21 @@
+{
+  "name": "member-2-blockchain-application",
+  "version": "1.0.0",
+  "description": "Member 2 Blockchain Verification Backend",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "qrcode": "^1.5.3",
+    "sqlite3": "^5.1.7"
+  }
+}

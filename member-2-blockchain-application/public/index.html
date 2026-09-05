@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Institution Dashboard - Certificate Manager</title>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #34495e; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; }
+        button:hover { background-color: #2980b9; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 6px; display: none; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        img#qrCode { max-width: 200px; margin-top: 15px; display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Issue New Certificate</h1>
+        <form id="issueForm">
+            <div class="form-group">
+                <label for="institutionId">Institution ID</label>
+                <input type="text" id="institutionId" required placeholder="e.g. UNIV01">
+            </div>
+            <div class="form-group">
+                <label for="certificateId">Certificate ID</label>
+                <input type="text" id="certificateId" required placeholder="Unique Cert ID">
+            </div>
+            <div class="form-group">
+                <label for="studentName">Student Name</label>
+                <input type="text" id="studentName" required>
+            </div>
+            <div class="form-group">
+                <label for="courseName">Course Name</label>
+                <input type="text" id="courseName" required>
+            </div>
+            <div class="form-group">
+                <label for="pdf">Certificate PDF</label>
+                <input type="file" id="pdf" accept="application/pdf" required>
+            </div>
+            <button type="submit">Issue Certificate to Blockchain</button>
+        </form>
+
+        <div id="resultBox" class="result">
+            <h3 id="resultMessage"></h3>
+            <p id="resultHash"></p>
+            <a id="resultUrl" href="#" target="_blank">Verify Link</a>
+            <img id="qrCode" src="" alt="QR Code" style="display:none;">
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('issueForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('institutionId', document.getElementById('institutionId').value);
+            formData.append('certificateId', document.getElementById('certificateId').value);
+            formData.append('studentName', document.getElementById('studentName').value);
+            formData.append('courseName', document.getElementById('courseName').value);
+            formData.append('pdf', document.getElementById('pdf').files[0]);
+
+            const submitBtn = e.target.querySelector('button');
+            submitBtn.textContent = 'Issuing... (Please wait)';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await fetch('/api/certificates/issue', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                const resultBox = document.getElementById('resultBox');
+                const resultMessage = document.getElementById('resultMessage');
+                
+                if (response.ok) {
+                    resultBox.className = 'result success';
+                    resultBox.style.display = 'block';
+                    resultMessage.textContent = 'Certificate Issued Successfully!';
+                    document.getElementById('resultHash').textContent = `Blockchain Hash: ${data.hash}`;
+                    
+                    const urlElem = document.getElementById('resultUrl');
+                    urlElem.href = data.verifyUrl;
+                    urlElem.textContent = 'Open Verification Portal';
+                    
+                    const qr = document.getElementById('qrCode');
+                    qr.src = data.qrCode;
+                    qr.style.display = 'block';
+                    
+                    e.target.reset();
+                } else {
+                    throw new Error(data.error || 'Failed to issue');
+                }
+            } catch (error) {
+                const resultBox = document.getElementById('resultBox');
+                resultBox.className = 'result error';
+                resultBox.style.display = 'block';
+                document.getElementById('resultMessage').textContent = 'Error: ' + error.message;
+            } finally {
+                submitBtn.textContent = 'Issue Certificate to Blockchain';
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
