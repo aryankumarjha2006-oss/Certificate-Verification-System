@@ -11,7 +11,8 @@ import CredentialDetails from './pages/CredentialDetails';
 import Analytics from './pages/Analytics';
 import Issuers from './pages/Issuers';
 import Settings from './pages/Settings';
-import LoadingScreen from './components/common/LoadingScreen';
+import BlockchainLoader from './components/common/BlockchainLoader';
+import btcCoin from './assets/bitcoin-coin.jpg';
 import { blockchainService } from './services/blockchain';
 
 import './styles/tokens.css';
@@ -23,6 +24,7 @@ function App() {
   const [network, setNetwork] = useState(null);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [isInitializing, setIsInitializing] = useState(true);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -36,7 +38,7 @@ function App() {
       setNetwork(data.network);
     } catch (err) {
       console.error(err);
-      alert("Failed to connect wallet. Ensure MetaMask is installed and on the correct network.");
+      alert(`Failed to connect wallet: ${err.message || err}`);
     }
   };
 
@@ -49,13 +51,39 @@ function App() {
           // silent fail for init
         }
       }
-      setTimeout(() => setIsInitializing(false), 2600); // allow loading screen to show animation
     };
     init();
+
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', () => {
+        connect();
+      });
+      window.ethereum.on('chainChanged', () => {
+        window.location.reload();
+      });
+    }
+
+    const iv = setInterval(() => {
+      setProgress(p => Math.min(p + 2, 100));
+    }, 50);
+    return () => {
+      clearInterval(iv);
+      if (window.ethereum) {
+        window.ethereum.removeAllListeners('accountsChanged');
+        window.ethereum.removeAllListeners('chainChanged');
+      }
+    };
   }, []);
 
   if (isInitializing) {
-    return <LoadingScreen />;
+    return (
+      <BlockchainLoader
+        progress={progress}
+        onComplete={() => setIsInitializing(false)}
+        coinSrc={btcCoin}
+        size={380}
+      />
+    );
   }
 
   return (

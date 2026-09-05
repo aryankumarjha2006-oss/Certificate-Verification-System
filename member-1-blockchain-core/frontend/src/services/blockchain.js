@@ -39,10 +39,17 @@ class BlockchainService {
 
     const address = await this.signer.getAddress();
     const network = await this.provider.getNetwork();
-    
+
+    let netName = network.name;
+    if (network.chainId === 31337n) {
+      netName = "Hardhat Local";
+    } else if (netName === "unknown") {
+      netName = "Localhost";
+    }
+
     return {
       address,
-      network: network.name === "unknown" ? "Localhost" : network.name
+      network: netName
     };
   }
 
@@ -63,7 +70,7 @@ class BlockchainService {
     const tx = await this.institutionRegistry.authorizeIssuer(instId, issuerWallet);
     return await tx.wait();
   }
-  
+
   async getInstitution(instId) {
     if (!this.digitalCredential) throw new Error("Wallet not connected");
     return await this.digitalCredential.getInstitution(instId);
@@ -105,16 +112,16 @@ class BlockchainService {
       "event CertificateRevoked(string indexed certificateId)",
       "event CertificateVersionCreated(string indexed certificateId, string newCertificateHash, uint256 newExpiryTimestamp, uint256 newVersion)"
     ], this.provider);
-    
+
     const instEventsFilter = this.institutionRegistry.filters.InstitutionRegistered();
     const instEvents = await this.institutionRegistry.queryFilter(instEventsFilter, 0, "latest");
-    
+
     const certIssuedFilter = certReg.filters.CertificateIssued();
     const certRevokedFilter = certReg.filters.CertificateRevoked();
-    
+
     const issuedEvents = await certReg.queryFilter(certIssuedFilter, 0, "latest");
     const revokedEvents = await certReg.queryFilter(certRevokedFilter, 0, "latest");
-    
+
     return {
        issued: issuedEvents.map(e => ({
            certId: e.args[0],
