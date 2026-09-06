@@ -25,10 +25,6 @@ export default function Verification() {
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (!certId.trim()) {
-      alert('Please enter a Credential ID');
-      return;
-    }
     if (!selectedFile) {
       alert('Please select a certificate PDF file');
       return;
@@ -39,7 +35,9 @@ export default function Verification() {
       setResult(null);
 
       const formData = new FormData();
-      formData.append('certificateId', certId.trim());
+      if (certId.trim()) {
+        formData.append('certificateId', certId.trim());
+      }
       formData.append('pdf', selectedFile);
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -49,6 +47,14 @@ export default function Verification() {
       });
 
       const data = await response.json();
+
+      if (data.requiresManualId) {
+        setResult({
+          status: 'MANUAL_ID_REQUIRED',
+          message: data.message || 'Credential ID could not be detected from this PDF. Enter it manually.'
+        });
+        return;
+      }
 
       if (!response.ok && data.error && !data.status) {
         throw new Error(data.error || 'Verification request failed');
@@ -102,6 +108,12 @@ export default function Verification() {
         desc: "No trusted blockchain record exists for this credential.",
         color: "var(--text-muted)", bg: "var(--border-subtle)"
       },
+      MANUAL_ID_REQUIRED: {
+        icon: <AlertTriangle size={48} color="var(--warning)" />,
+        title: "Credential ID Required",
+        desc: result.message || "Credential ID could not be detected from this PDF. Please enter it manually in the input above.",
+        color: "var(--warning)", bg: "var(--warning-bg)"
+      },
       ERROR: {
         icon: <AlertTriangle size={48} color="var(--danger)" />,
         title: "Verification Error",
@@ -142,8 +154,8 @@ export default function Verification() {
       <Card>
         <form onSubmit={handleVerify}>
           <div className="form-group">
-            <label className="form-label" style={{ fontWeight: 600 }}>Credential ID</label>
-            <input className="form-input" required placeholder="e.g. CERT-001" value={certId} onChange={e => setCertId(e.target.value)} />
+            <label className="form-label" style={{ fontWeight: 600 }}>Credential ID <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional - Auto-detected from PDF)</span></label>
+            <input className="form-input" placeholder="e.g. CERT-001 (Leave empty to auto-detect from QR)" value={certId} onChange={e => setCertId(e.target.value)} />
           </div>
 
           <div className="form-group" style={{ marginBottom: '1.5rem' }}>

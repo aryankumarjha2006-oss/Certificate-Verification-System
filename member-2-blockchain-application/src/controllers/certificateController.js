@@ -90,13 +90,39 @@ export const issueCertificate = async (req, res) => {
     }
 };
 
+// Helper to auto-detect Certificate ID from uploaded PDF buffer
+function extractCertificateIdFromPdf(buffer) {
+    if (!buffer) return null;
+    const raw = buffer.toString('latin1');
+
+    // 1. Search for URL parameter id=... or certId=... in QR code link or text annotations
+    const urlMatch = raw.match(/(?:verify(?:\.html)?\?id=|id=|certId=)([\w\-]+)/i);
+    if (urlMatch && urlMatch[1] && urlMatch[1].length >= 3) {
+        return urlMatch[1];
+    }
+
+    // 2. Search for explicit Certificate ID patterns (e.g. Certificate ID: CERT-123)
+    const certIdMatch = raw.match(/(?:Certificate\s*ID\s*:?\s*|Cert\s*ID\s*:?\s*)([\w\-]+)/i);
+    if (certIdMatch && certIdMatch[1] && certIdMatch[1].length >= 3) {
+        return certIdMatch[1];
+    }
+
+    // 3. Search for standard CredChain ID prefixes (CERT_, CERT-, AUDIT_CERT_, ISO_CERT_)
+    const prefixMatch = raw.match(/\b(CERT[_\-][A-Za-z0-9_\-]+|AUDIT_CERT_[A-Za-z0-9_\-]+|ISO_CERT_[A-Za-z0-9_\-]+)\b/i);
+    if (prefixMatch && prefixMatch[1]) {
+        return prefixMatch[1];
+    }
+
+    return null;
+}
+
 // Helper for safe audit logging (does not throw or disrupt verification responses)
 function logVerificationAttempt(certificateId, status, req) {
     try {
         const db = getDb();
         if (!db) return;
         const timestamp = new Date().toISOString();
-        const ipAddress = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip || 'unknown';
+        const ipAddress = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || 'unknown';
         const userAgent = req.headers['user-agent'] || 'unknown';
         
         db.run(
@@ -112,15 +138,24 @@ function logVerificationAttempt(certificateId, status, req) {
 }
 
 export const verifyCertificate = async (req, res) => {
-    const { certificateId } = req.body;
+    let certificateId = (req.body.certificateId || '').trim();
     try {
-        if (!certificateId) {
-            logVerificationAttempt(null, 'INVALID_INPUT', req);
-            return res.status(400).json({ error: 'certificateId is required' });
-        }
         if (!req.file) {
-            logVerificationAttempt(certificateId, 'MISSING_FILE', req);
+            logVerificationAttempt(certificateId || null, 'MISSING_FILE', req);
             return res.status(400).json({ error: 'PDF file is required' });
+        }
+
+        // Auto-detect Certificate ID from PDF if not manually provided
+        if (!certificateId) {
+            certificateId = extractCertificateIdFromPdf(req.file.buffer);
+            if (!certificateId) {
+                logVerificationAttempt('UNEXTRACTABLE', 'INVALID_INPUT', req);
+                return res.status(400).json({
+                    error: 'Credential ID could not be detected automatically from this PDF. Please enter the Credential ID manually.',
+                    requiresManualId: true
+                });
+            }
+            console.log(`[Verification] Auto-detected Credential ID from PDF: ${certificateId}`);
         }
         
         const documentHash = computeSHA256(req.file.buffer);
@@ -143,7 +178,7 @@ export const verifyCertificate = async (req, res) => {
 
         res.json({ certificateId, status, version });
     } catch (error) {
-        logVerificationAttempt(certificateId, 'ERROR', req);
+        logVerificationAttempt(certificateId || 'ERROR', 'ERROR', req);
         console.error('Verify error:', error);
         res.status(500).json({ error: 'Failed to verify certificate', details: error.message || error });
     }

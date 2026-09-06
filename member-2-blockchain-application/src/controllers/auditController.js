@@ -9,12 +9,17 @@ export const getAuditEvents = async (req, res) => {
         const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 25));
         const offset = (page - 1) * limit;
 
-        const { eventType, search, certificateId, institutionId, issuer } = req.query;
+        const { eventType, search, certificateId, institutionId, issuer, source } = req.query;
 
         const whereClauses = [];
         const params = [];
 
-        if (eventType && eventType.trim() !== '' && eventType !== 'ALL') {
+        if (source && source.trim() !== '' && source.toUpperCase() !== 'ALL') {
+            whereClauses.push('source = ?');
+            params.push(source.trim().toLowerCase());
+        }
+
+        if (eventType && eventType.trim() !== '' && eventType.toUpperCase() !== 'ALL') {
             whereClauses.push('eventType = ?');
             params.push(eventType.trim());
         }
@@ -37,37 +42,77 @@ export const getAuditEvents = async (req, res) => {
         if (search && search.trim() !== '') {
             const searchTerm = `%${search.trim().toLowerCase()}%`;
             whereClauses.push(
-                '(LOWER(certificateId) LIKE ? OR LOWER(institutionId) LIKE ? OR LOWER(issuer) LIKE ? OR LOWER(transactionHash) LIKE ?)'
+                '(LOWER(certificateId) LIKE ? OR LOWER(institutionId) LIKE ? OR LOWER(issuer) LIKE ? OR LOWER(transactionHash) LIKE ? OR LOWER(status) LIKE ? OR LOWER(eventType) LIKE ?)'
             );
-            params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+            params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
         }
 
         const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-        // Query total events count
+        const unifiedQuery = `
+            FROM (
+                SELECT
+                    'bc_' || id as uniqueId,
+                    id as rawId,
+                    'blockchain' as source,
+                    'blockchain' as type,
+                    eventType,
+                    certificateId,
+                    institutionId,
+                    issuer,
+                    timestamp,
+                    blockNumber,
+                    transactionHash,
+                    logIndex,
+                    version,
+                    NULL as status,
+                    NULL as ipAddress,
+                    NULL as userAgent
+                FROM blockchain_events
+
+                UNION ALL
+
+                SELECT
+                    'vl_' || id as uniqueId,
+                    id as rawId,
+                    'application' as source,
+                    'verification' as type,
+                    'Credential Verified' as eventType,
+                    certificateId,
+                    NULL as institutionId,
+                    NULL as issuer,
+                    timestamp,
+                    NULL as blockNumber,
+                    NULL as transactionHash,
+                    NULL as logIndex,
+                    1 as version,
+                    status,
+                    ipAddress,
+                    userAgent
+                FROM verification_logs
+            ) unified_audit
+        `;
+
+        // Query total unified events count
         const totalCount = await new Promise((resolve, reject) => {
-            db.get(`SELECT COUNT(*) as count FROM blockchain_events ${whereSql}`, params, (err, row) => {
+            db.get(`SELECT COUNT(*) as count ${unifiedQuery} ${whereSql}`, params, (err, row) => {
                 if (err) return reject(err);
                 resolve(row ? row.count : 0);
             });
         });
 
-        // Query max block number
+        // Query max block number from blockchain events
         const latestBlock = await new Promise((resolve) => {
             db.get(`SELECT MAX(blockNumber) as maxBlock FROM blockchain_events`, [], (err, row) => {
                 resolve(err || !row || !row.maxBlock ? 0 : Number(row.maxBlock));
             });
         });
 
-        // Query paginated events
+        // Query paginated unified events sorted chronologically by timestamp descending
         const queryParams = [...params, limit, offset];
         const events = await new Promise((resolve, reject) => {
             db.all(
-                `SELECT id, eventType, certificateId, institutionId, issuer, timestamp, blockNumber, transactionHash, logIndex, version 
-                 FROM blockchain_events 
-                 ${whereSql} 
-                 ORDER BY blockNumber DESC, logIndex DESC, id DESC 
-                 LIMIT ? OFFSET ?`,
+                `SELECT * ${unifiedQuery} ${whereSql} ORDER BY timestamp DESC, rawId DESC LIMIT ? OFFSET ?`,
                 queryParams,
                 (err, rows) => {
                     if (err) return reject(err);
@@ -89,7 +134,7 @@ export const getAuditEvents = async (req, res) => {
             latestBlock
         });
     } catch (error) {
-        console.error('Error fetching audit events:', error);
+        console.error('Error fetching unified audit events:', error);
         res.status(500).json({ error: 'Failed to fetch audit events', details: error.message });
     }
 };

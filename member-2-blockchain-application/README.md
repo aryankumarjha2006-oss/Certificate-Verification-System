@@ -73,9 +73,27 @@ For production deployment, the local signer key resolver (`getInstitutionSigner`
 | `POST` | `/api/certificates/issue` | **Protected (JWT)** | Signs transaction on-chain via institution wallet, saves metadata off-chain, returns receipt & QR. | `multipart/form-data`: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) |
 | `POST` | `/api/certificates/revoke` | **Protected (JWT)** | Signs and submits on-chain revocation transaction via institution wallet. | `application/json`: `{ "institutionId": "...", "certificateId": "..." }` |
 | `POST` | `/api/certificates/version` | **Protected (JWT)** | Signs new version transaction on-chain via institution wallet. | `multipart/form-data`: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) |
-| `POST` | `/api/certificates/verify` | **Public** | Hashes uploaded PDF and verifies cryptographic status against blockchain (logs attempt). | `multipart/form-data`: `certificateId`, `pdf` (file) |
+| `POST` | `/api/certificates/verify` | **Public** | Auto-detects credential ID from embedded QR code (or optional `certificateId`), hashes uploaded PDF, and verifies cryptographic status against blockchain. Logs attempt to SQLite `verification_logs`. | `multipart/form-data`: `pdf` (file, required), `certificateId` (optional) |
 | `GET` | `/api/certificates/:id` | **Public** | Retrieves off-chain certificate metadata. | URL parameter: `id` |
-| `GET` | `/api/audit/events` | **Protected (JWT)** | Queries full indexed event history (`CertificateIssued`, `CertificateRevoked`, `CertificateVersionCreated`). | Query params: `page`, `limit`, `eventType`, `search` |
+| `GET` | `/api/audit/events` | **Protected (JWT)** | Unified Audit Trail: Combines on-chain lifecycle events (`Source: Blockchain`) and application verification activity (`Source: Application Verification Log`). | Query params: `page`, `limit`, `eventType`, `source` (`ALL`, `blockchain`, `application`), `search` |
+
+---
+
+## 🔍 Public Verification & Unified Audit Architecture
+
+### PDF Verification & QR Auto-Detection Flow
+1. **Public Verifier Uploads PDF**: Uploads candidate certificate PDF.
+2. **Credential ID Auto-Detection**: Backend scans the PDF stream for embedded verification QR URL parameters (`id=<certId>`) or certificate ID text patterns.
+3. **Manual Fallback**: If the credential ID cannot be auto-detected, the verifier is prompted to provide the Credential ID manually.
+4. **Cryptographic SHA-256 Hashing**: PDF bytes are hashed using SHA-256.
+5. **On-Chain Smart Contract Lookup**: `DigitalCredential.verifyCertificate(certificateId, hash)` executes read-only on the blockchain.
+6. **Result Returned**: Returns status (`VALID`, `TAMPERED`, `REVOKED`, `EXPIRED`, `NOT_FOUND`). Blockchain remains 100% authoritative.
+7. **Application Verification Logged**: Attempt is recorded in SQLite `verification_logs` with timestamp, result, IP address, and user agent.
+
+### Unified Audit Trail Design
+* **Blockchain Events (`Source: Blockchain`)**: State-changing lifecycle operations (`CertificateIssued`, `CertificateRevoked`, `CertificateVersionCreated`) with block numbers and transaction hashes.
+* **Application Logs (`Source: Application Verification Log`)**: Non-state-changing read verification attempts logged in SQLite with status, timestamp, IP address, and user agent.
+* **Separation of Concerns**: Verification logs are explicitly marked as application read operations and NEVER fabricated as fake blockchain transactions.
 
 ---
 

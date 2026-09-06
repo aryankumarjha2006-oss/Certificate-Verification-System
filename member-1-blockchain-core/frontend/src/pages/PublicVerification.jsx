@@ -37,10 +37,6 @@ export default function PublicVerification({ theme, toggleTheme }) {
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    if (!certId.trim()) {
-      alert('Please enter a Credential ID');
-      return;
-    }
     if (!selectedFile) {
       alert('Please select a certificate PDF file');
       return;
@@ -51,7 +47,9 @@ export default function PublicVerification({ theme, toggleTheme }) {
       setResult(null);
 
       const formData = new FormData();
-      formData.append('certificateId', certId.trim());
+      if (certId.trim()) {
+        formData.append('certificateId', certId.trim());
+      }
       formData.append('pdf', selectedFile);
 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -62,6 +60,14 @@ export default function PublicVerification({ theme, toggleTheme }) {
 
       const data = await response.json();
 
+      if (data.requiresManualId) {
+        setResult({
+          status: 'MANUAL_ID_REQUIRED',
+          message: data.message || 'Credential ID could not be detected from this PDF. Enter it manually.'
+        });
+        return;
+      }
+
       if (!response.ok && data.error && !data.status) {
         throw new Error(data.error || 'Verification request failed');
       }
@@ -70,15 +76,17 @@ export default function PublicVerification({ theme, toggleTheme }) {
       let version = data.version != null ? data.version.toString() : '-';
       let details = null;
 
-      if (['VALID', 'TAMPERED', 'REVOKED', 'EXPIRED'].includes(statusText) && blockchainService.digitalCredential) {
+      const activeCertId = data.certificateId || certId.trim();
+
+      if (['VALID', 'TAMPERED', 'REVOKED', 'EXPIRED'].includes(statusText) && blockchainService.digitalCredential && activeCertId) {
         try {
           const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
           const certReg = new ethers.Contract(certRegAddress, [
             "function certificates(string) view returns (string, string, address, uint256, uint8, uint256)"
           ], blockchainService.provider);
 
-          const cert = await certReg.certificates(certId.trim());
-          if (cert && cert[0] === certId.trim()) {
+          const cert = await certReg.certificates(activeCertId);
+          if (cert && cert[0] === activeCertId) {
             details = {
               id: cert[0],
               hash: cert[1],
@@ -93,7 +101,7 @@ export default function PublicVerification({ theme, toggleTheme }) {
         }
       }
 
-      setResult({ status: statusText, version, details, certificateId: data.certificateId || certId.trim() });
+      setResult({ status: statusText, version, details, certificateId: activeCertId });
 
     } catch (err) {
       console.error('Verification error:', err);
@@ -136,6 +144,12 @@ export default function PublicVerification({ theme, toggleTheme }) {
         title: "CREDENTIAL NOT FOUND",
         desc: "No trusted blockchain record exists for this credential ID.",
         color: "var(--text-muted)", bg: "var(--border-subtle)"
+      },
+      MANUAL_ID_REQUIRED: {
+        icon: <AlertTriangle size={56} color="var(--warning)" />,
+        title: "CREDENTIAL ID REQUIRED",
+        desc: result.message || "Credential ID could not be detected automatically from this PDF. Please enter it manually in the input above.",
+        color: "var(--warning)", bg: "var(--warning-bg)"
       }
     };
 
@@ -239,8 +253,8 @@ export default function PublicVerification({ theme, toggleTheme }) {
           <Card className="modal-enter" style={{ padding: '2.5rem' }}>
             <form onSubmit={handleVerify}>
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600 }}>Credential ID</label>
-                <input className="form-input" required placeholder="e.g. CERT-2026-001" value={certId} onChange={e => setCertId(e.target.value)} style={{ padding: '1rem', fontSize: '1rem' }} />
+                <label className="form-label" style={{ fontWeight: 600 }}>Credential ID <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(Optional - Auto-detected from PDF)</span></label>
+                <input className="form-input" placeholder="e.g. CERT-2026-001 (Leave empty to auto-detect from QR)" value={certId} onChange={e => setCertId(e.target.value)} style={{ padding: '1rem', fontSize: '1rem' }} />
               </div>
 
               <div className="form-group" style={{ marginBottom: '2rem' }}>

@@ -11,6 +11,7 @@ export default function BlockchainActivityPage() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEventType, setSelectedEventType] = useState('ALL');
+  const [selectedSource, setSelectedSource] = useState('ALL');
 
   // Pagination
   const [page, setPage] = useState(1);
@@ -22,8 +23,8 @@ export default function BlockchainActivityPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
   useEffect(() => {
-    loadAuditEvents(page, selectedEventType, searchTerm);
-  }, [page, selectedEventType, searchTerm, blockchainService.provider]);
+    loadAuditEvents(page, selectedEventType, selectedSource, searchTerm);
+  }, [page, selectedEventType, selectedSource, searchTerm, blockchainService.provider]);
 
   const getAuthToken = async () => {
     let token = localStorage.getItem('token') || localStorage.getItem('credchain_token');
@@ -46,7 +47,7 @@ export default function BlockchainActivityPage() {
     return token;
   };
 
-  const loadAuditEvents = async (pageNum, eventTypeFilter, search) => {
+  const loadAuditEvents = async (pageNum, eventTypeFilter, sourceFilter, search) => {
     try {
       setLoading(true);
       setError(null);
@@ -58,6 +59,7 @@ export default function BlockchainActivityPage() {
         page: pageNum,
         limit: limit,
         ...(eventTypeFilter !== 'ALL' && { eventType: eventTypeFilter }),
+        ...(sourceFilter !== 'ALL' && { source: sourceFilter }),
         ...(search.trim() !== '' && { search: search.trim() })
       });
 
@@ -108,10 +110,10 @@ export default function BlockchainActivityPage() {
       };
 
       const combined = [
-        ...e1.map(e => ({ eventType: 'InstitutionRegistered', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), institutionId: parseArg(e.args[0]), issuer: e.args[2] })),
-        ...e2.map(e => ({ eventType: 'IssuerAuthorized', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), institutionId: parseArg(e.args[0]), issuer: parseArg(e.args[1]) })),
-        ...e3.map(e => ({ eventType: 'CertificateIssued', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), certificateId: parseArg(e.args[0]), issuer: parseArg(e.args[2]), version: Number(e.args[4] || 1) })),
-        ...e4.map(e => ({ eventType: 'CertificateRevoked', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), certificateId: parseArg(e.args[0]) }))
+        ...e1.map(e => ({ source: 'blockchain', eventType: 'InstitutionRegistered', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), institutionId: parseArg(e.args[0]), issuer: e.args[2] })),
+        ...e2.map(e => ({ source: 'blockchain', eventType: 'IssuerAuthorized', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), institutionId: parseArg(e.args[0]), issuer: parseArg(e.args[1]) })),
+        ...e3.map(e => ({ source: 'blockchain', eventType: 'CertificateIssued', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), certificateId: parseArg(e.args[0]), issuer: parseArg(e.args[2]), version: Number(e.args[4] || 1) })),
+        ...e4.map(e => ({ source: 'blockchain', eventType: 'CertificateRevoked', blockNumber: Number(e.blockNumber), transactionHash: String(e.transactionHash || ''), certificateId: parseArg(e.args[0]) }))
       ];
 
       combined.sort((a,b) => b.blockNumber - a.blockNumber);
@@ -123,7 +125,28 @@ export default function BlockchainActivityPage() {
     }
   };
 
-  const getEventBadge = (name) => {
+  const getEventBadge = (event) => {
+    const name = typeof event === 'string' ? event : event.eventType;
+    const source = typeof event === 'object' ? event.source : null;
+    const status = typeof event === 'object' ? event.status : null;
+
+    if (source === 'application' || name === 'Credential Verified' || name === 'Certificate Verified') {
+      switch (status) {
+        case 'VALID':
+          return <Badge type="success">Credential Verified (VALID)</Badge>;
+        case 'TAMPERED':
+          return <Badge type="warning">Credential Verified (TAMPERED)</Badge>;
+        case 'REVOKED':
+          return <Badge type="danger">Credential Verified (REVOKED)</Badge>;
+        case 'EXPIRED':
+          return <Badge type="warning">Credential Verified (EXPIRED)</Badge>;
+        case 'NOT_FOUND':
+          return <Badge type="neutral">Credential Verified (NOT_FOUND)</Badge>;
+        default:
+          return <Badge type="neutral">Credential Verified</Badge>;
+      }
+    }
+
     switch (name) {
       case 'CertificateIssued':
         return <Badge type="success">Certificate Issued</Badge>;
@@ -187,7 +210,7 @@ export default function BlockchainActivityPage() {
       <Card>
         {/* Search & Filter Controls */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '280px', maxWidth: '480px' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '280px', maxWidth: '440px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -202,11 +225,25 @@ export default function BlockchainActivityPage() {
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <Filter size={18} color="var(--text-muted)" />
             <select
               className="form-input"
-              style={{ minWidth: '200px', cursor: 'pointer' }}
+              style={{ minWidth: '160px', cursor: 'pointer' }}
+              value={selectedSource}
+              onChange={(e) => {
+                setSelectedSource(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="ALL">All Sources</option>
+              <option value="blockchain">Blockchain Events</option>
+              <option value="application">Application Logs</option>
+            </select>
+
+            <select
+              className="form-input"
+              style={{ minWidth: '180px', cursor: 'pointer' }}
               value={selectedEventType}
               onChange={(e) => {
                 setSelectedEventType(e.target.value);
@@ -217,6 +254,7 @@ export default function BlockchainActivityPage() {
               <option value="CertificateIssued">Certificate Issued</option>
               <option value="CertificateRevoked">Certificate Revoked</option>
               <option value="CertificateVersionCreated">Certificate Version Created</option>
+              <option value="Credential Verified">Credential Verified</option>
               <option value="InstitutionRegistered">Institution Registered</option>
               <option value="InstitutionDeactivated">Institution Deactivated</option>
               <option value="IssuerAuthorized">Issuer Authorized</option>
@@ -227,25 +265,25 @@ export default function BlockchainActivityPage() {
 
         {/* Content Body */}
         {loading ? (
-          <LoadingState message="Fetching blockchain audit events..." />
+          <LoadingState message="Fetching audit events..." />
         ) : error ? (
           <ErrorState
             title="Unable to Load Audit Trail"
             message={error}
-            onRetry={() => loadAuditEvents(page, selectedEventType, searchTerm)}
+            onRetry={() => loadAuditEvents(page, selectedEventType, selectedSource, searchTerm)}
           />
         ) : events.length === 0 ? (
-          pagination.total === 0 && selectedEventType === 'ALL' && searchTerm.trim() === '' ? (
+          pagination.total === 0 && selectedEventType === 'ALL' && selectedSource === 'ALL' && searchTerm.trim() === '' ? (
             <EmptyState
               icon={Activity}
-              title="No Blockchain Activity Yet"
-              description="No blockchain events have been recorded yet. Issue a credential, register an institution, or authorize an issuer to generate activity."
+              title="No Activity Recorded"
+              description="No audit events have been recorded yet. Issue or verify a credential to generate activity."
             />
           ) : (
             <EmptyState
               icon={Search}
               title="No Matching Events"
-              description="No blockchain events match the current search or filters."
+              description="No audit events match the current search or filters."
             />
           )
         ) : (
@@ -255,11 +293,11 @@ export default function BlockchainActivityPage() {
                 <thead>
                   <tr>
                     <th>Time</th>
+                    <th>Source</th>
                     <th>Event Type</th>
                     <th>Entity Reference</th>
-                    <th>Issuer</th>
-                    <th>Block</th>
-                    <th>Transaction Hash</th>
+                    <th>Issuer / IP</th>
+                    <th>Block / Tx</th>
                     <th>Version</th>
                     <th style={{ textAlign: 'right' }}>Details</th>
                   </tr>
@@ -268,6 +306,7 @@ export default function BlockchainActivityPage() {
                   {events.map((e, idx) => {
                     const entity = e.certificateId || e.institutionId || '-';
                     const isCert = Boolean(e.certificateId);
+                    const isAppLog = e.source === 'application';
                     return (
                       <tr
                         key={e.id || idx}
@@ -277,7 +316,14 @@ export default function BlockchainActivityPage() {
                         <td style={{ fontSize: '0.85rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                           {formatDate(e.timestamp)}
                         </td>
-                        <td>{getEventBadge(e.eventType)}</td>
+                        <td>
+                          {isAppLog ? (
+                            <Badge type="neutral" title="Application Verification Log (SQLite)">APPLICATION LOG</Badge>
+                          ) : (
+                            <Badge type="primary" title="On-Chain Event (Solidity/EVM)">BLOCKCHAIN</Badge>
+                          )}
+                        </td>
+                        <td>{getEventBadge(e)}</td>
                         <td>
                           {isCert ? (
                             <Link
@@ -292,14 +338,18 @@ export default function BlockchainActivityPage() {
                             <span className="mono" style={{ fontWeight: 500 }}>{entity}</span>
                           )}
                         </td>
-                        <td className="mono" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }} title={e.issuer}>
-                          {formatAddress(e.issuer)}
+                        <td className="mono" style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }} title={isAppLog ? e.ipAddress : e.issuer}>
+                          {isAppLog ? (e.ipAddress || '-') : formatAddress(e.issuer)}
                         </td>
-                        <td className="mono" style={{ fontSize: '0.85rem' }}>
-                          #{e.blockNumber || 0}
-                        </td>
-                        <td onClick={(ev) => ev.stopPropagation()}>
-                          <HashDisplay value={e.transactionHash} />
+                        <td className="mono" style={{ fontSize: '0.85rem' }} onClick={(ev) => ev.stopPropagation()}>
+                          {isAppLog ? (
+                            <span style={{ color: 'var(--text-muted)' }}>Read Op (N/A)</span>
+                          ) : (
+                            <div>
+                              <div>#{e.blockNumber || 0}</div>
+                              {e.transactionHash && <HashDisplay value={e.transactionHash} />}
+                            </div>
+                          )}
                         </td>
                         <td>
                           {e.version ? <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 600 }}>v{e.version}</span> : '-'}
@@ -363,15 +413,19 @@ export default function BlockchainActivityPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
               <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Event Type</div>
-                <div>{getEventBadge(selectedEvent.eventType)}</div>
-              </div>
-              {selectedEvent.version && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Event Source</div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Version</div>
-                  <Badge type="neutral">Version {selectedEvent.version}</Badge>
+                  {selectedEvent.source === 'application' ? (
+                    <Badge type="neutral">Application Verification Log (SQLite)</Badge>
+                  ) : (
+                    <Badge type="primary">Blockchain (Solidity / EVM)</Badge>
+                  )}
                 </div>
-              )}
+              </div>
+              <div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Event Type</div>
+                <div>{getEventBadge(selectedEvent)}</div>
+              </div>
             </div>
 
             {selectedEvent.certificateId && (
@@ -400,10 +454,25 @@ export default function BlockchainActivityPage() {
               </div>
             )}
 
+            {selectedEvent.source === 'application' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>IP Address</div>
+                  <div className="mono" style={{ fontSize: '0.95rem' }}>{selectedEvent.ipAddress || 'Unknown / Local'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>User Agent</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>{selectedEvent.userAgent || 'Unknown'}</div>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Block Number</div>
-                <div className="mono" style={{ fontSize: '0.95rem' }}>#{selectedEvent.blockNumber || 0}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Block Number / Type</div>
+                <div className="mono" style={{ fontSize: '0.95rem' }}>
+                  {selectedEvent.source === 'application' ? 'Read Operation (No Block)' : `#${selectedEvent.blockNumber || 0}`}
+                </div>
               </div>
               <div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Timestamp</div>
@@ -412,8 +481,14 @@ export default function BlockchainActivityPage() {
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Transaction Hash</div>
-              <HashDisplay value={selectedEvent.transactionHash} />
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Transaction Hash / Reference</div>
+              {selectedEvent.source === 'application' ? (
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  N/A — Application Read Operation (Not a state-changing blockchain transaction)
+                </div>
+              ) : (
+                <HashDisplay value={selectedEvent.transactionHash} />
+              )}
             </div>
           </div>
         )}
