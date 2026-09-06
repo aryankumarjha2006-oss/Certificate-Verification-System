@@ -66,7 +66,7 @@ export default function Home({ theme, toggleTheme }) {
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
           )}
-          <button className="btn btn-secondary" onClick={() => navigate('/verify')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/verify', { state: { from: 'home' } })}>
             <Search size={18} /> Verify Credential
           </button>
           <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>
@@ -87,7 +87,7 @@ export default function Home({ theme, toggleTheme }) {
               Blockchain-powered digital credentials with transparent, tamper-evident verification and complete lifecycle management.
             </p>
             <div style={{ display: 'flex', gap: '1rem' }}>
-              <button className="btn btn-primary" onClick={() => navigate('/verify')} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
+              <button className="btn btn-primary" onClick={() => navigate('/verify', { state: { from: 'home' } })} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
                 Verify a Credential
               </button>
               <button className="btn btn-secondary" onClick={() => navigate('/dashboard')} style={{ padding: '1rem 2rem', fontSize: '1.1rem' }}>
@@ -189,7 +189,7 @@ export default function Home({ theme, toggleTheme }) {
           <p style={{ fontSize: '1.25rem', color: 'var(--text-muted)', marginBottom: '3rem', maxWidth: '600px', margin: '0 auto 3rem' }}>
             Confirm that a credential matches its trusted blockchain record. Instant, transparent, and cryptographic verification.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/verify')} style={{ padding: '1.25rem 3rem', fontSize: '1.25rem' }}>
+          <button className="btn btn-primary" onClick={() => navigate('/verify', { state: { from: 'home' } })} style={{ padding: '1.25rem 3rem', fontSize: '1.25rem' }}>
             Verify Credential
           </button>
         </section>
@@ -210,7 +210,7 @@ export default function Home({ theme, toggleTheme }) {
               <h4 style={{ marginBottom: '1rem' }}>Navigation</h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', color: 'var(--text-muted)' }}>
                 <span style={{cursor: 'pointer'}} onClick={()=>navigate('/')}>Home</span>
-                <span style={{cursor: 'pointer'}} onClick={()=>navigate('/verify')}>Verify</span>
+                <span style={{cursor: 'pointer'}} onClick={()=>navigate('/verify', { state: { from: 'home' } })}>Verify</span>
                 <span style={{cursor: 'pointer'}} onClick={()=>navigate('/dashboard')}>Dashboard</span>
               </div>
             </div>

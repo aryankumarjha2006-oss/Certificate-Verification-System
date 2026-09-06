@@ -2,13 +2,22 @@ import React, { useState } from 'react';
 import { Card, HashDisplay } from '../components/common/Components';
 import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function PublicVerification({ theme, toggleTheme }) {
   const [form, setForm] = useState({ certId: '', hash: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBack = () => {
+    if (location.state?.from === 'home') {
+      navigate('/');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   const handleVerify = async (e) => {
     e.preventDefault();
@@ -170,7 +179,7 @@ export default function PublicVerification({ theme, toggleTheme }) {
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
           )}
-          <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ border: 'none', background: 'transparent' }}>
+          <button className="btn btn-secondary" onClick={handleBack} style={{ border: 'none', background: 'transparent' }}>
             <ArrowLeft size={18} /> Back to Home
           </button>
         </div>
