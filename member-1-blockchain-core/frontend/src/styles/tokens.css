@@ -7,6 +7,7 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --text-sidebar: #cbd5e1;
+  --text-sidebar-title: #ffffff;
   --text-inverse: #ffffff;
 
   --primary: #0f172a; /* Deep Navy */
@@ -52,41 +53,42 @@
 }
 
 [data-theme="dark"] {
-  /* Premium Dark Theme */
-  --bg-main: #0b1120; /* Very Dark Navy */
-  --bg-card: #141c2f; /* Slate Navy */
-  --bg-sidebar: #070b14;
+  /* Refined Neutral Charcoal / Graphite Dark Theme */
+  --bg-main: #0F1115;
+  --bg-card: #15181D;
+  --bg-sidebar: #15181D;
 
-  --text-main: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-sidebar: #cbd5e1;
-  --text-inverse: #ffffff;
+  --text-main: #F3F4F6;
+  --text-muted: #A7ADB7;
+  --text-sidebar: #A7ADB7;
+  --text-sidebar-title: #F3F4F6;
+  --text-inverse: #0F1115;
 
-  --primary: #38bdf8;
-  --primary-hover: #7dd3fc;
-  --secondary: #2563eb;
-  --secondary-hover: #3b82f6;
-  --accent: #0ea5e9;
-  --accent-light: rgba(14, 165, 233, 0.15);
+  --primary: #F3F4F6;
+  --primary-hover: #E5E7EB;
+  --secondary: #3B82F6;
+  --secondary-hover: #2563EB;
+  --accent: #20242B;
+  --accent-light: rgba(255, 255, 255, 0.08);
 
-  --success: #10b981;
+  --success: #10B981;
   --success-bg: rgba(16, 185, 129, 0.15);
-  --success-text: #34d399;
+  --success-text: #34D399;
 
-  --warning: #f59e0b;
+  --warning: #F59E0B;
   --warning-bg: rgba(245, 158, 11, 0.15);
-  --warning-text: #fbbf24;
+  --warning-text: #FBBF24;
 
-  --danger: #ef4444;
+  --danger: #EF4444;
   --danger-bg: rgba(239, 68, 68, 0.15);
-  --danger-text: #f87171;
+  --danger-text: #F87171;
 
-  --border: #1e293b;
-  --border-subtle: #0f172a;
+  --border: #2A2F37;
+  --border-subtle: #1B1F25;
 
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.2);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.7), 0 4px 6px -4px rgb(0 0 0 / 0.5);
 }
 
 body {
