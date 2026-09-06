@@ -26,20 +26,36 @@ export default function Issuers() {
       setLoading(true);
       const instReg = blockchainService.institutionRegistry;
 
+      // Query registered institutions to resolve human-readable names
+      const instFilter = instReg.filters.InstitutionRegistered();
+      const instEvents = await instReg.queryFilter(instFilter, 0, "latest");
+      const instNameMap = new Map();
+      instEvents.forEach(e => {
+        const h = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0]?.hash || String(e.args[0] || ''));
+        instNameMap.set(h, e.args[1] || 'Unknown Institution');
+      });
+
       const authFilter = instReg.filters.IssuerAuthorized();
       const authEvents = await instReg.queryFilter(authFilter, 0, "latest");
 
       const revokedFilter = instReg.filters.IssuerRevoked();
       const revokedEvents = await instReg.queryFilter(revokedFilter, 0, "latest");
 
-      const revokedSet = new Set(revokedEvents.map(e => `${e.args[0]}-${e.args[1]}`));
+      const revokedSet = new Set(revokedEvents.map(e => {
+        const rId = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0]?.hash || String(e.args[0] || ''));
+        const rWallet = typeof e.args[1] === 'string' ? e.args[1] : String(e.args[1] || '');
+        return `${rId}-${rWallet}`;
+      }));
 
       const loaded = authEvents.map(e => {
-        const instId = e.args[0];
-        const wallet = e.args[1];
-        const key = `${instId}-${wallet}`;
+        const idRaw = e.args[0];
+        const safeHash = typeof idRaw === 'string' ? idRaw : (idRaw?.hash || String(idRaw || ''));
+        const displayName = instNameMap.get(safeHash) || (safeHash.length > 20 ? `${safeHash.substring(0, 10)}...${safeHash.substring(safeHash.length - 6)}` : safeHash);
+        const wallet = typeof e.args[1] === 'string' ? e.args[1] : String(e.args[1] || '');
+        const key = `${safeHash}-${wallet}`;
         return {
-          instId,
+          instId: displayName,
+          rawId: safeHash,
           wallet,
           status: revokedSet.has(key) ? 'REVOKED' : 'AUTHORIZED'
         };
@@ -48,7 +64,7 @@ export default function Issuers() {
       // Deduplicate keeping latest status
       const uniqueMap = new Map();
       loaded.forEach(item => {
-        uniqueMap.set(`${item.instId}-${item.wallet}`, item);
+        uniqueMap.set(`${item.rawId}-${item.wallet}`, item);
       });
 
       setIssuers(Array.from(uniqueMap.values()));
@@ -86,10 +102,12 @@ export default function Issuers() {
     }
   };
 
-  const filtered = issuers.filter(iss =>
-    iss.instId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    iss.wallet.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = (issuers || []).filter(iss => {
+    const term = (searchTerm || '').toLowerCase();
+    const matchInst = String(iss.instId || '').toLowerCase().includes(term);
+    const matchWallet = String(iss.wallet || '').toLowerCase().includes(term);
+    return matchInst || matchWallet;
+  });
 
   return (
     <div>
