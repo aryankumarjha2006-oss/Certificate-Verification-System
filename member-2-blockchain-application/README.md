@@ -1,43 +1,62 @@
-# Member 2: Blockchain Application & Verification Layer
+# Member 2: Blockchain Application & CredChain Managed Signing Layer
 
-This directory contains the off-chain application, REST backend, frontend verification portal, and Ethers.js blockchain integration for the Blockchain Certificate Verification System.
-
----
-
-## 🏛️ Architecture Overview
-
-The system is built on a clean separation between **on-chain trust anchor** and **off-chain privacy & presentation**:
-
-* **On-Chain (Member 1 Core):** Immutable certificate IDs, SHA-256 document digests, issuer addresses, issuance timestamps, expiry timestamps, versions, and revocation states.
-* **Off-Chain (Member 2 Application):** PDF document handling, SHA-256 hash computation, student/course metadata in SQLite, QR verification URL generation, and background event synchronization.
+This directory contains the off-chain Express REST backend, SQLite indexing database, Ethers.js blockchain integration, and CredChain Managed Signing infrastructure for the Blockchain Certificate Verification System.
 
 ---
 
-## 🚀 Getting Started
+## 🏛️ Architecture & System Philosophy
 
-### 1. Prerequisites
-* Node.js (v18+ recommended)
-* Running local Hardhat node from `member-1-blockchain-core` (`npx hardhat node`)
-* Deployed smart contracts (`npx hardhat run scripts/deploy.js --network localhost`)
+CredChain delivers a **Web2-like seamless user experience with genuine, uncompromised Web3 blockchain-backed trust underneath**.
 
-### 2. Environment Configuration
-Create a `.env` file in this directory (or use `.env.example`):
-```env
-PORT=3000
-RPC_URL=http://127.0.0.1:8545
-PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-INSTITUTION_REGISTRY_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-CERTIFICATE_REGISTRY_ADDRESS=0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512
-DIGITAL_CREDENTIAL_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
-JWT_SECRET=your_jwt_secret_here
+### Core UX Goal
+**Institutions and public verifiers do NOT need to install MetaMask, browser wallet extensions, or manage gas fees.**
+* **Institutions** log in, fill certificate details, compile PDFs, and issue credentials seamlessly through the web application.
+* **CredChain Backend** securely signs smart contract transactions on-chain using distinct, institution-specific wallet identities.
+* **Smart Contracts** (`DigitalCredential.sol`, `CertificateRegistry.sol`, `InstitutionRegistry.sol`) remain the authoritative source of truth for all certificate verification and lifecycle operations.
+* **Public Verifiers & Students** scan QR codes or upload PDFs for 100% wallet-free instant verification.
+
+```
+Institution User
+       ↓
+CredChain Web App (REST API + JWT Auth)
+       ↓
+Secure Institutional Signing Layer (getInstitutionSigner(institutionId))
+       ↓
+Smart Contract (msg.sender = Institution Authorized Wallet)
+       ↓
+Hardhat / Ethereum Blockchain (On-Chain State & Events)
+       ↓
+SQLite Indexer & Off-Chain Metadata Cache
 ```
 
-### 3. Install Dependencies & Start Server
-```bash
-npm install
-npm start
-```
-The server will start on `http://localhost:3000`.
+---
+
+## 🔐 On-Chain vs. Off-Chain Data Separation
+
+| Storage Domain | Data Fields Retained | Responsibility & Trust Model |
+| :--- | :--- | :--- |
+| **On-Chain (Blockchain)** | `certificateId`, `certificateHash` (SHA-256), `issuer` (Institutional Wallet), `issueTimestamp`, `expiryTimestamp`, `status` (ACTIVE/REVOKED), `version`, `institutionId` | **Authoritative Source of Truth.** Immutable, tamper-evident, decentralized execution. |
+| **Off-Chain (SQLite & Server)** | Student Name, Course Name, Issue Date, PDF Storage/Buffers, Verification Logs, User Credentials, Auth Tokens | **Presentation & Privacy Layer.** Protects student PII and enables rich application search/indexing. |
+
+> **Security Note:** Blockchain provides a tamper-evident record of the certificate's cryptographic proof and lifecycle state. PII (Personally Identifiable Information) is NEVER stored on the blockchain or inside QR codes.
+
+---
+
+## 🛡️ Production Key Management & Custody Architecture
+
+For local development and testing, CredChain uses Hardhat development accounts mapped to institution IDs (`DEMO_INST_01` -> Account #1 `0x7099...79C8`, `INST-002` -> Account #2 `0x3C44...93BC`).
+
+For production deployment, the local signer key resolver (`getInstitutionSigner`) can be seamlessly swapped to enterprise key custody solutions:
+
+1. **Cloud KMS / HSM (AWS KMS / GCP Cloud KMS / Azure Key Vault)**:
+   * Private keys are generated and locked inside FIPS 140-2 Level 3 hardware security modules.
+   * Server signs transactions via KMS API calls; private keys NEVER enter application memory or network traffic.
+2. **Multi-Party Computation (MPC)**:
+   * Institutional key shares are distributed across independent security nodes (e.g. Fireblocks, Web3Auth, Fordefi).
+3. **Account Abstraction (ERC-4337) & Delegated Relayers**:
+   * Smart Contract Wallets execute transactions sponsored by paymasters, completely eliminating gas fee UX friction.
+4. **Multisig / Timelock Governance**:
+   * High-value institutional administrative actions require multi-signature approval from designated registrar keys.
 
 ---
 
@@ -48,29 +67,24 @@ The server will start on `http://localhost:3000`.
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/auth/login` | Authenticates issuer/admin and returns signed JWT token. | `application/json`: `{ "username": "admin", "password": "..." }` |
 
-### Certificates & Verification
+### Certificates & Managed Blockchain Signing
 | Method | Route | Access | Description | Request Payload |
 | :--- | :--- | :--- | :--- | :--- |
-| `POST` | `/api/certificates/issue` | **Protected (JWT)** | Issues certificate on-chain, saves metadata off-chain, returns QR code. | `multipart/form-data`: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) |
-| `POST` | `/api/certificates/revoke` | **Protected (JWT)** | Submits on-chain revocation transaction. | `application/json`: `{ "institutionId": "...", "certificateId": "..." }` |
-| `POST` | `/api/certificates/version` | **Protected (JWT)** | Updates certificate hash & increments version on-chain. | `multipart/form-data`: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) |
-| `POST` | `/api/certificates/verify` | **Public** | Hashes uploaded PDF and verifies cryptographic status against blockchain (logs verification attempt). | `multipart/form-data`: `certificateId`, `pdf` (file) |
+| `POST` | `/api/certificates/issue` | **Protected (JWT)** | Signs transaction on-chain via institution wallet, saves metadata off-chain, returns receipt & QR. | `multipart/form-data`: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) |
+| `POST` | `/api/certificates/revoke` | **Protected (JWT)** | Signs and submits on-chain revocation transaction via institution wallet. | `application/json`: `{ "institutionId": "...", "certificateId": "..." }` |
+| `POST` | `/api/certificates/version` | **Protected (JWT)** | Signs new version transaction on-chain via institution wallet. | `multipart/form-data`: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) |
+| `POST` | `/api/certificates/verify` | **Public** | Hashes uploaded PDF and verifies cryptographic status against blockchain (logs attempt). | `multipart/form-data`: `certificateId`, `pdf` (file) |
 | `GET` | `/api/certificates/:id` | **Public** | Retrieves off-chain certificate metadata. | URL parameter: `id` |
-| `GET` | `/api/certificates/:id/audit` | **Protected (JWT)** | Retrieves audit verification history for a specific certificate ID. | URL parameter: `id` |
-| `GET` | `/api/certificates/audit/all` | **Protected (JWT)** | Retrieves full verification audit history log. | None |
+| `GET` | `/api/audit/events` | **Protected (JWT)** | Queries full indexed event history (`CertificateIssued`, `CertificateRevoked`, `CertificateVersionCreated`). | Query params: `page`, `limit`, `eventType`, `search` |
 
 ---
 
-## 🖥️ Frontend Portals
+## 🔒 Security Threat Model
 
-1. **Institution Dashboard (`/index.html`)**: Allows authorized institution issuers to issue new digital certificates with PDF uploads, metadata capture, and instant QR code generation.
-2. **Public Verification Portal (`/verify.html`)**: QR code target page. Anyone can submit a certificate PDF to verify its authenticity against the smart contract. Clearly indicates `VALID`, `TAMPERED`, `REVOKED`, `EXPIRED`, or `NOT_FOUND` statuses.
-
----
-
-## 🔒 Security & Data Integrity
-
-* **Zero PII on Blockchain:** Only SHA-256 cryptographic hashes are submitted to smart contracts.
-* **Tamper Evident:** Comparing the hash of an uploaded file against the smart contract immediately identifies any tampering.
-* **Dynamic Event Synchronization:** Ethers.js background listeners capture `CertificateRevoked` and state change events to synchronize the SQLite database automatically.
-* **Environment Protection:** Secrets, keys, and SQLite database files are excluded from Git via `.gitignore`.
+| Threat | Mitigated By | Mechanism |
+| :--- | :--- | :--- |
+| **Unauthorized Institution Issuance** | Smart Contract | `isAuthorizedIssuer(institutionId, msg.sender)` check on-chain. |
+| **Tampered PDF Document** | Cryptographic Hash | SHA-256 hash computed from PDF bytes fails on-chain verification check. |
+| **Database Compromise** | Blockchain Authority | SQLite cannot alter or forge on-chain certificate validity or hash. |
+| **Private Key Exposure** | Server Signer Isolation | Private keys are server-side only; NEVER sent to browser JS, localStorage, or `VITE_*` env. |
+| **QR Code Forgery** | URL + Hash Verify | QR code contains only public URL and ID; verification re-hashes uploaded document against smart contract. |

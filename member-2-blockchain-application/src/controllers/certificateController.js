@@ -1,4 +1,4 @@
-import { getDigitalCredentialContract } from '../config/blockchain.js';
+import { getDigitalCredentialContract, getDigitalCredentialContractForInstitution, getInstitutionSigner, verifyInstitutionSignerOnChain, getLiveNonce, parseContractError } from '../config/blockchain.js';
 import { getDb } from '../config/database.js';
 import { computeSHA256 } from '../services/hashService.js';
 import qrcode from 'qrcode';
@@ -15,30 +15,43 @@ export const issueCertificate = async (req, res) => {
         if (req.file) {
             documentHash = computeSHA256(req.file.buffer);
         }
-        
-        const contract = getDigitalCredentialContract();
-        
-        // Verify on-chain existence & validity (transaction was signed by Institution Wallet via MetaMask)
+        if (!documentHash) {
+            return res.status(400).json({ error: 'Certificate document hash or PDF file is required' });
+        }
+
+        const expiryTimestamp = req.body.expiryTimestamp ? parseInt(req.body.expiryTimestamp) : 0;
+        const signer = getInstitutionSigner(institutionId);
+        const signerAddress = await signer.getAddress();
+        await verifyInstitutionSignerOnChain(institutionId, signerAddress);
+        const contract = getDigitalCredentialContractForInstitution(institutionId);
+
+        let txHash = req.body.txHash || null;
+        let blockNumber = null;
+
+        // Check on-chain status
         let onChainCert = null;
         try {
             onChainCert = await contract.getCertificate(certificateId);
         } catch (e) {
-            return res.status(404).json({
-                error: 'Certificate not found on-chain',
-                details: `Certificate ${certificateId} must first be issued on-chain by the authorized institution wallet before metadata synchronization.`
-            });
-        }
-        
-        if (!onChainCert || !(onChainCert[7] ?? onChainCert.exists)) {
-            return res.status(400).json({ error: `Certificate ${certificateId} does not exist on the blockchain.` });
+            // Not found on chain yet
         }
 
-        const onChainHash = String(onChainCert[1] || onChainCert.certificateHash || '');
-        if (documentHash && onChainHash && onChainHash.toLowerCase() !== documentHash.toLowerCase()) {
-            return res.status(400).json({
-                error: 'Hash mismatch',
-                details: `Submitted PDF SHA-256 hash (${documentHash}) does not match on-chain hash (${onChainHash}).`
-            });
+        if (!onChainCert || !(onChainCert[7] ?? onChainCert.exists)) {
+            console.log(`[Managed Signing] Issuing ${certificateId} for ${institutionId} on-chain via wallet ${signerAddress}...`);
+            const nonce = await getLiveNonce(signer);
+            const tx = await contract.issueCertificate(institutionId, certificateId, documentHash, expiryTimestamp, { nonce });
+            const receipt = await tx.wait();
+            txHash = receipt.hash;
+            blockNumber = receipt.blockNumber;
+            console.log(`[Managed Signing] Certificate ${certificateId} confirmed on-chain in block ${blockNumber} (tx: ${txHash})`);
+        } else {
+            const onChainHash = String(onChainCert[1] || onChainCert.certificateHash || '');
+            if (documentHash && onChainHash && onChainHash.toLowerCase() !== documentHash.toLowerCase()) {
+                return res.status(400).json({
+                    error: 'Hash mismatch',
+                    details: `Submitted PDF SHA-256 hash (${documentHash}) does not match on-chain hash (${onChainHash}).`
+                });
+            }
         }
 
         // Save metadata to off-chain DB
@@ -58,17 +71,22 @@ export const issueCertificate = async (req, res) => {
                 } catch (e) {}
 
                 res.status(201).json({
-                    message: 'Certificate synchronized successfully',
+                    message: 'Certificate issued & synchronized successfully on-chain',
                     certificateId,
-                    hash: onChainHash || documentHash,
+                    hash: documentHash,
+                    txHash,
+                    blockNumber,
+                    issuer: signerAddress,
+                    institutionId,
                     qrCode: qrCodeDataUrl,
                     verifyUrl
                 });
             }
         );
     } catch (error) {
-        console.error('Synchronization error:', error);
-        res.status(500).json({ error: 'Failed to synchronize certificate metadata', details: error.message || error });
+        const parsedMsg = parseContractError(error);
+        console.error('Issuance error:', parsedMsg, error);
+        res.status(500).json({ error: 'Failed to issue certificate on-chain', details: parsedMsg });
     }
 };
 
@@ -137,17 +155,27 @@ export const revokeCertificate = async (req, res) => {
         if (!institutionId || !certificateId) {
             return res.status(400).json({ error: 'institutionId and certificateId are required' });
         }
-        const contract = getDigitalCredentialContract();
+        const signer = getInstitutionSigner(institutionId);
+        const signerAddress = await signer.getAddress();
+        await verifyInstitutionSignerOnChain(institutionId, signerAddress);
+        const contract = getDigitalCredentialContractForInstitution(institutionId);
         
-        console.log(`Revoking ${certificateId} on-chain...`);
-        const tx = await contract.revokeCertificate(institutionId, certificateId);
-        await tx.wait();
+        console.log(`[Managed Signing] Revoking ${certificateId} on-chain for ${institutionId} via wallet ${signerAddress}...`);
+        const nonce = await getLiveNonce(signer);
+        const tx = await contract.revokeCertificate(institutionId, certificateId, { nonce });
+        const receipt = await tx.wait();
         
-        res.json({ message: 'Certificate revoked successfully', certificateId });
-        // The event listener will update the DB
+        res.json({
+            message: 'Certificate revoked successfully on-chain',
+            certificateId,
+            txHash: receipt.hash,
+            blockNumber: receipt.blockNumber,
+            issuer: signerAddress
+        });
     } catch (error) {
-        console.error('Revoke error:', error);
-        res.status(500).json({ error: 'Failed to revoke certificate', details: error.message || error });
+        const parsedMsg = parseContractError(error);
+        console.error('Revoke error:', parsedMsg, error);
+        res.status(500).json({ error: 'Failed to revoke certificate on-chain', details: parsedMsg });
     }
 };
 
@@ -157,15 +185,20 @@ export const createNewVersion = async (req, res) => {
         if (!institutionId || !certificateId) {
             return res.status(400).json({ error: 'institutionId and certificateId are required' });
         }
-        if (!req.file) return res.status(400).json({ error: 'PDF file is required' });
+        if (!req.file && !req.body.hash) return res.status(400).json({ error: 'PDF file or hash is required' });
         
-        const newDocumentHash = computeSHA256(req.file.buffer);
+        const newDocumentHash = req.file ? computeSHA256(req.file.buffer) : req.body.hash;
         const newExpiryTimestamp = req.body.newExpiryTimestamp ? parseInt(req.body.newExpiryTimestamp) : 0;
         
-        const contract = getDigitalCredentialContract();
-        console.log(`Creating new version for ${certificateId} on-chain...`);
-        const tx = await contract.createNewVersion(institutionId, certificateId, newDocumentHash, newExpiryTimestamp);
-        await tx.wait();
+        const signer = getInstitutionSigner(institutionId);
+        const signerAddress = await signer.getAddress();
+        await verifyInstitutionSignerOnChain(institutionId, signerAddress);
+        const contract = getDigitalCredentialContractForInstitution(institutionId);
+
+        console.log(`[Managed Signing] Creating new version for ${certificateId} on-chain via wallet ${signerAddress}...`);
+        const nonce = await getLiveNonce(signer);
+        const tx = await contract.createNewVersion(institutionId, certificateId, newDocumentHash, newExpiryTimestamp, { nonce });
+        const receipt = await tx.wait();
         
         let version = null;
         try {
@@ -174,14 +207,18 @@ export const createNewVersion = async (req, res) => {
         } catch (e) {}
         
         res.json({
-            message: 'Certificate version created successfully',
+            message: 'Certificate version created successfully on-chain',
             certificateId,
             newHash: newDocumentHash,
-            version
+            version,
+            txHash: receipt.hash,
+            blockNumber: receipt.blockNumber,
+            issuer: signerAddress
         });
     } catch (error) {
-        console.error('Create version error:', error);
-        res.status(500).json({ error: 'Failed to create new certificate version', details: error.message || error });
+        const parsedMsg = parseContractError(error);
+        console.error('Create version error:', parsedMsg, error);
+        res.status(500).json({ error: 'Failed to create new certificate version on-chain', details: parsedMsg });
     }
 };
 

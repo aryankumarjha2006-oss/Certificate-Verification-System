@@ -58,6 +58,9 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
         </div>
       </div>
       <div className="header-right">
+        <Badge type="info" style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}>
+          <Shield size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} /> Managed Signing Active
+        </Badge>
         {toggleTheme && (
           <button
             type="button"
@@ -105,7 +108,7 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
              </div>
           </div>
         ) : (
-          <button className="btn btn-primary" onClick={connect}>Connect Wallet</button>
+          <button className="btn btn-secondary" onClick={connect} title="Optional advanced mode: connect browser wallet directly">Connect MetaMask (Optional)</button>
         )}
       </div>
     </header>
