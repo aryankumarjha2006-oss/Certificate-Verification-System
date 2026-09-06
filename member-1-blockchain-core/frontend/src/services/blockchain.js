@@ -90,14 +90,42 @@ class BlockchainService {
   }
 
   async getInstitution(instId) {
-    if (!this.digitalCredential) throw new Error("Wallet not connected");
-    return await this.digitalCredential.getInstitution(instId);
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+    return await contract.getInstitution(instId);
+  }
+
+  async isAuthorizedIssuer(instId, issuerWallet) {
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+
+    try {
+      const inst = await contract.getInstitution(instId);
+      if (!inst || !inst.exists || !inst.isActive) {
+        return { isAuthorized: false, reason: `Institution "${instId}" does not exist or is inactive.` };
+      }
+
+      const isAuth = await contract.isAuthorizedIssuer(instId, issuerWallet);
+
+      // If isAuth is true OR if connected wallet matches institution primary wallet
+      const isPrimaryWallet = inst.wallet && inst.wallet.toLowerCase() === issuerWallet.toLowerCase();
+
+      if (isAuth || isPrimaryWallet) {
+        return { isAuthorized: true, institution: inst, isPrimary: isPrimaryWallet };
+      }
+
+      return {
+        isAuthorized: false,
+        reason: `Wallet ${issuerWallet.substring(0, 6)}...${issuerWallet.substring(38)} is not an authorized issuer for ${inst.name} (${instId}).`
+      };
+    } catch (err) {
+      return { isAuthorized: false, reason: err.reason || err.message || "Failed to query institution contract authorization." };
+    }
   }
 
   // --- Certificate operations ---
   async issueCertificate(instId, certId, hash, expiry) {
-    if (!this.digitalCredential) throw new Error("Wallet not connected");
-    return await this.digitalCredential.issueCertificate(instId, certId, hash, expiry);
+    if (!this.signer) throw new Error("MetaMask wallet is not connected");
+    const contract = this.digitalCredential.connect(this.signer);
+    return await contract.issueCertificate(instId, certId, hash, expiry);
   }
 
   async verifyCertificate(certId, hash) {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, HashDisplay, Modal } from '../components/common/Components';
 import { LoadingState, EmptyState, TransactionStatus, Toast } from '../components/common/UIStates';
-import { Plus, Search, Eye, Ban, History, FileCheck } from 'lucide-react';
+import { Plus, Search, Eye, Ban, Download, FileCheck, CheckCircle2, AlertTriangle, ShieldCheck, FileText, ArrowRight } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
+import { generateCertificatePDF } from '../services/pdfGenerator';
 import { useNavigate } from 'react-router-dom';
 
 export default function Certificates() {
@@ -10,15 +11,29 @@ export default function Certificates() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Transaction State
-  const [txStatus, setTxStatus] = useState(null); // 'waiting-wallet', 'submitted', 'confirmed', 'error'
+  // Transaction & Toast States
+  const [txStatus, setTxStatus] = useState(null);
   const [txHash, setTxHash] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  // Toast State
-  const [toast, setToast] = useState(null); // { title, message, type }
-
+  // Modal & Creator States
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ instId: '', certId: '', hash: '', expiry: '' });
+  const [step, setStep] = useState(1); // 1: Form, 2: PDF Preview & Auth Check, 3: Success
+  const [formData, setFormData] = useState({
+    instId: 'DEMO_INST_01',
+    instName: 'Global Tech University',
+    studentName: 'Alice Johnson',
+    courseName: 'B.S. Computer Science & Cybersecurity',
+    certId: `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    expiry: ''
+  });
+
+  // Generated Artifacts State
+  const [generatedPdf, setGeneratedPdf] = useState(null); // { pdfBlob, pdfArrayBuffer, docHash, verifyUrl }
+  const [authCheck, setAuthCheck] = useState({ checking: false, isAuthorized: false, reason: '' });
+  const [issuing, setIssuing] = useState(false);
+  const [issuedResult, setIssuedResult] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,8 +45,6 @@ export default function Certificates() {
       if (!blockchainService.provider) return;
       setLoading(true);
       const data = await blockchainService.getAllEvents();
-
-      // We map the issued events, check if they are in revoked
       const revokedSet = new Set(data.revoked.map(r => r.certId));
 
       const enriched = data.issued.map(cert => ({
@@ -44,53 +57,162 @@ export default function Certificates() {
 
       setCredentials(enriched);
     } catch (err) {
-      console.error(err);
+      console.error('Error loading credentials:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleIssue = async (e) => {
+  const handleOpenModal = () => {
+    setFormData({
+      instId: 'DEMO_INST_01',
+      instName: 'Global Tech University',
+      studentName: 'Alice Johnson',
+      courseName: 'B.S. Computer Science & Cybersecurity',
+      certId: `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      expiry: ''
+    });
+    setGeneratedPdf(null);
+    setAuthCheck({ checking: false, isAuthorized: false, reason: '' });
+    setIssuedResult(null);
+    setStep(1);
+    setIsModalOpen(true);
+  };
+
+  // Step 1 -> Step 2: Generate PDF + QR + SHA-256 Hash
+  const handleGeneratePdf = async (e) => {
     e.preventDefault();
+    if (!formData.instId.trim() || !formData.certId.trim() || !formData.studentName.trim() || !formData.courseName.trim()) {
+      alert("Please fill in all required fields.");
+      return;
+    }
+
     try {
+      setAuthCheck({ checking: true, isAuthorized: false, reason: '' });
+
+      const pdfData = await generateCertificatePDF({
+        studentName: formData.studentName.trim(),
+        courseName: formData.courseName.trim(),
+        certId: formData.certId.trim(),
+        institutionId: formData.instId.trim(),
+        institutionName: formData.instName.trim(),
+        expiryDate: formData.expiry ? new Date(formData.expiry).toLocaleDateString() : "No Expiry"
+      });
+
+      setGeneratedPdf(pdfData);
+
+      // Verify connected wallet authorization on-chain
+      if (typeof window.ethereum === "undefined") {
+        setAuthCheck({ checking: false, isAuthorized: false, reason: "MetaMask extension is not installed in your browser." });
+      } else {
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (!accounts || accounts.length === 0) {
+          setAuthCheck({ checking: false, isAuthorized: false, reason: "MetaMask wallet is not connected. Click 'Connect Wallet' in the top header first." });
+        } else {
+          const connectedAddress = accounts[0];
+          const check = await blockchainService.isAuthorizedIssuer(formData.instId.trim(), connectedAddress);
+          setAuthCheck({
+            checking: false,
+            isAuthorized: check.isAuthorized,
+            reason: check.reason || '',
+            connectedAddress
+          });
+        }
+      }
+
+      setStep(2);
+    } catch (err) {
+      console.error("PDF Generation error:", err);
+      alert(`Failed to generate certificate PDF: ${err.message}`);
+    }
+  };
+
+  // Step 2 -> Step 3: Sign via MetaMask & Issue On-Chain
+  const handleSignAndIssue = async () => {
+    if (!generatedPdf) return;
+    try {
+      setIssuing(true);
       setTxStatus('waiting-wallet');
-      setIsModalOpen(false);
 
       const expiryTimestamp = formData.expiry ? Math.floor(new Date(formData.expiry).getTime() / 1000) : 0;
 
-      // Start transaction
-      const tx = await blockchainService.digitalCredential.issueCertificate(
-        formData.instId,
-        formData.certId,
-        formData.hash,
+      // 1. Send transaction directly via connected MetaMask signer
+      const tx = await blockchainService.issueCertificate(
+        formData.instId.trim(),
+        formData.certId.trim(),
+        generatedPdf.docHash,
         expiryTimestamp
       );
 
       setTxStatus('submitted');
       setTxHash(tx.hash);
 
+      // 2. Wait for transaction to be mined on Hardhat blockchain
       await tx.wait();
       setTxStatus('confirmed');
 
+      // 3. Synchronize application record with Express backend
       try {
-        const local = JSON.parse(localStorage.getItem('credchain_local_certs') || '[]');
-        if (!local.find(c => c.id === formData.certId)) {
-          local.push({ id: formData.certId, institutionId: formData.instId });
-          localStorage.setItem('credchain_local_certs', JSON.stringify(local));
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        const syncForm = new FormData();
+        syncForm.append('institutionId', formData.instId.trim());
+        syncForm.append('certificateId', formData.certId.trim());
+        syncForm.append('studentName', formData.studentName.trim());
+        syncForm.append('courseName', formData.courseName.trim());
+        syncForm.append('issueDate', new Date().toISOString());
+        syncForm.append('hash', generatedPdf.docHash);
+        syncForm.append('pdf', generatedPdf.pdfBlob, `${formData.certId.trim()}.pdf`);
+
+        const syncRes = await fetch(`${API_URL}/api/certificates/issue`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          },
+          body: syncForm
+        });
+
+        if (!syncRes.ok) {
+          console.warn("Backend metadata sync warning:", await syncRes.text());
         }
-      } catch (e) {}
+      } catch (syncErr) {
+        console.warn("Could not sync with backend off-chain DB, continuing:", syncErr);
+      }
+
+      setIssuedResult({
+        certId: formData.certId.trim(),
+        hash: generatedPdf.docHash,
+        txHash: tx.hash,
+        pdfBlob: generatedPdf.pdfBlob
+      });
 
       setToast({
         type: 'success',
-        title: 'Credential Issued Successfully',
-        message: `ID: ${formData.certId}`
+        title: 'Certificate Issued On-Chain!',
+        message: `Signed by MetaMask: ${tx.hash.substring(0, 10)}...`
       });
 
+      setStep(3);
       loadCredentials();
     } catch (err) {
-      console.error(err);
+      console.error("Issuance error:", err);
       setTxStatus('error');
+      alert(`Issuance Failed: ${err.reason || err.message || err}`);
+    } finally {
+      setIssuing(false);
     }
+  };
+
+  const handleDownloadPdf = () => {
+    if (!generatedPdf && !issuedResult?.pdfBlob) return;
+    const blob = issuedResult?.pdfBlob || generatedPdf?.pdfBlob;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${formData.certId.trim()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handleRevoke = async (certId) => {
@@ -132,10 +254,10 @@ export default function Certificates() {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 className="page-title">Credentials</h1>
-          <p className="page-subtitle">Manage issuance, revocation, and versions of digital credentials.</p>
+          <p className="page-subtitle">Manage institution-controlled certificate creation and on-chain issuance.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={18} /> Issue Credential
+        <button className="btn btn-primary" onClick={handleOpenModal}>
+          <Plus size={18} /> Create & Issue Certificate
         </button>
       </div>
 
@@ -172,7 +294,7 @@ export default function Certificates() {
              title="No Credentials Found"
              description="There are no credentials matching your criteria."
              action={
-               <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>Issue Credential</button>
+               <button className="btn btn-primary" onClick={handleOpenModal}>Create Certificate</button>
              }
           />
         ) : (
@@ -181,7 +303,7 @@ export default function Certificates() {
               <thead>
                 <tr>
                   <th>Credential ID</th>
-                  <th>Issuer</th>
+                  <th>Issuer Wallet</th>
                   <th>Issue Date</th>
                   <th>Status</th>
                   <th style={{textAlign: 'right'}}>Actions</th>
@@ -190,7 +312,7 @@ export default function Certificates() {
               <tbody>
                 {filtered.map((cert, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{String(cert.certId || '')}</td>
+                    <td style={{ fontWeight: 600 }}>{String(cert.certId || '')}</td>
                     <td className="mono" style={{ fontSize: '0.85rem' }}>
                       {typeof cert.issuer === 'string' && cert.issuer.length > 10 ? `${cert.issuer.substring(0, 10)}...` : String(cert.issuer || '')}
                     </td>
@@ -218,29 +340,171 @@ export default function Certificates() {
         )}
       </Card>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Issue New Credential">
-        <form onSubmit={handleIssue}>
-          <div className="form-group">
-            <label className="form-label">Institution ID</label>
-            <input className="form-input" required value={formData.instId} onChange={e => setFormData({...formData, instId: e.target.value})} placeholder="e.g. INST-001" />
+      {/* --- Certificate Creation & Issuance Modal --- */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Institution Certificate Creator & Issuer">
+        {step === 1 && (
+          <form onSubmit={handleGeneratePdf}>
+            <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <strong>Institution-Controlled Issuance:</strong> Fills certificate details, generates the PDF with an embedded verification QR code, computes its SHA-256 hash, and prompts your MetaMask wallet for on-chain signing.
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>Institution ID</label>
+                <input className="form-input" required value={formData.instId} onChange={e => setFormData({...formData, instId: e.target.value})} placeholder="e.g. DEMO_INST_01" />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>Institution Name</label>
+                <input className="form-input" required value={formData.instName} onChange={e => setFormData({...formData, instName: e.target.value})} placeholder="e.g. Global Tech University" />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>Student Full Name</label>
+              <input className="form-input" required value={formData.studentName} onChange={e => setFormData({...formData, studentName: e.target.value})} placeholder="e.g. Alice Johnson" />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" style={{ fontWeight: 600 }}>Course / Degree Program</label>
+              <input className="form-input" required value={formData.courseName} onChange={e => setFormData({...formData, courseName: e.target.value})} placeholder="e.g. B.S. Computer Science & Cybersecurity" />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>Certificate Identifier</label>
+                <input className="form-input mono" required value={formData.certId} onChange={e => setFormData({...formData, certId: e.target.value})} placeholder="e.g. CERT-2026-001" />
+              </div>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>Expiration Date (Optional)</label>
+                <input type="datetime-local" className="form-input" value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">
+                Generate PDF & Hash <ArrowRight size={16} />
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 2 && generatedPdf && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem auto' }}>
+                <FileText size={24} />
+              </div>
+              <h3 style={{ margin: '0 0 0.25rem 0' }}>Certificate Ready for Blockchain Signing</h3>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>The final PDF has been compiled with an embedded QR code and hashed.</p>
+            </div>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Student Name:</span>
+                <span style={{ fontWeight: 600 }}>{formData.studentName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Course Program:</span>
+                <span style={{ fontWeight: 600 }}>{formData.courseName}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Certificate ID:</span>
+                <span className="mono" style={{ fontWeight: 600 }}>{formData.certId}</span>
+              </div>
+
+              <div style={{ borderTop: '1px dashed var(--border)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem' }}>
+                  Deterministic PDF SHA-256 Hash
+                </div>
+                <div className="mono" style={{ fontSize: '0.8rem', wordBreak: 'break-all', color: 'var(--primary)', background: 'var(--bg-card)', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  {generatedPdf.docHash}
+                </div>
+              </div>
+            </div>
+
+            {/* Authorization Status Badge */}
+            {authCheck.checking ? (
+              <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '1.5rem' }}>
+                Verifying on-chain issuer authorization...
+              </div>
+            ) : authCheck.isAuthorized ? (
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 'var(--radius-md)', color: 'var(--success)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                <ShieldCheck size={18} />
+                <div>
+                  <strong>Authorized Issuer Verified:</strong> Connected wallet <span className="mono">{authCheck.connectedAddress?.substring(0, 8)}...</span> is authorized to sign for {formData.instId}.
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 'var(--radius-md)', color: 'var(--danger)', fontSize: '0.85rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                <AlertTriangle size={18} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <strong>Authorization Error:</strong> {authCheck.reason || "Connected wallet is not authorized."}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginTop: '1.5rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setStep(1)} disabled={issuing}>
+                Back to Edit
+              </button>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={handleDownloadPdf}>
+                  <Download size={16} /> Download Draft PDF
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleSignAndIssue}
+                  disabled={!authCheck.isAuthorized || issuing}
+                >
+                  {issuing ? 'Issuing on Blockchain...' : 'Sign & Issue via MetaMask'}
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Credential ID</label>
-            <input className="form-input" required value={formData.certId} onChange={e => setFormData({...formData, certId: e.target.value})} placeholder="e.g. CERT-2026-001" />
+        )}
+
+        {step === 3 && issuedResult && (
+          <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(34, 197, 94, 0.1)', color: 'var(--success)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem auto' }}>
+              <CheckCircle2 size={36} />
+            </div>
+            <h2 style={{ color: 'var(--success)', margin: '0 0 0.5rem 0' }}>Certificate Issued Successfully!</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+              The transaction has been confirmed on the blockchain by your institution wallet.
+            </p>
+
+            <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', textAlign: 'left', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                <span>Credential ID:</span>
+                <span className="mono" style={{ fontWeight: 600 }}>{issuedResult.certId}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                <span>On-Chain Status:</span>
+                <Badge type="success">ACTIVE</Badge>
+              </div>
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Transaction Hash</div>
+                <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-main)', wordBreak: 'break-all' }}>{issuedResult.txHash}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <button className="btn btn-primary" onClick={handleDownloadPdf} style={{ width: '100%', padding: '0.75rem', justifyContent: 'center' }}>
+                <Download size={18} /> Download Verified Certificate PDF
+              </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <button className="btn btn-secondary" onClick={() => { setIsModalOpen(false); navigate(`/credentials/${issuedResult.certId}`); }}>
+                  View Credential
+                </button>
+                <button className="btn btn-secondary" onClick={() => { setIsModalOpen(false); navigate(`/verify?id=${issuedResult.certId}`); }}>
+                  Verify PDF
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="form-group">
-            <label className="form-label">Document Hash (SHA-256)</label>
-            <input className="form-input mono" required value={formData.hash} onChange={e => setFormData({...formData, hash: e.target.value})} placeholder="0x..." />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Expiration Date (Optional)</label>
-            <input type="datetime-local" className="form-input" value={formData.expiry} onChange={e => setFormData({...formData, expiry: e.target.value})} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn btn-primary">Issue on Blockchain</button>
-          </div>
-        </form>
+        )}
       </Modal>
     </div>
   );

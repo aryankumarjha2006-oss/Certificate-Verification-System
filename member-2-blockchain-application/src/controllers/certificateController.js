@@ -10,43 +10,65 @@ export const issueCertificate = async (req, res) => {
         if (!institutionId || !certificateId || !studentName || !courseName) {
             return res.status(400).json({ error: 'institutionId, certificateId, studentName, and courseName are required' });
         }
-        if (!req.file) return res.status(400).json({ error: 'PDF file is required' });
         
-        const documentHash = computeSHA256(req.file.buffer);
-        const expiryTimestamp = req.body.expiryTimestamp ? parseInt(req.body.expiryTimestamp) : 0;
+        let documentHash = req.body.hash || null;
+        if (req.file) {
+            documentHash = computeSHA256(req.file.buffer);
+        }
         
         const contract = getDigitalCredentialContract();
         
-        console.log(`Issuing ${certificateId} on-chain...`);
-        const tx = await contract.issueCertificate(institutionId, certificateId, documentHash, expiryTimestamp);
-        await tx.wait();
+        // Verify on-chain existence & validity (transaction was signed by Institution Wallet via MetaMask)
+        let onChainCert = null;
+        try {
+            onChainCert = await contract.getCertificate(certificateId);
+        } catch (e) {
+            return res.status(404).json({
+                error: 'Certificate not found on-chain',
+                details: `Certificate ${certificateId} must first be issued on-chain by the authorized institution wallet before metadata synchronization.`
+            });
+        }
         
-        // Save to off-chain DB
+        if (!onChainCert || !(onChainCert[7] ?? onChainCert.exists)) {
+            return res.status(400).json({ error: `Certificate ${certificateId} does not exist on the blockchain.` });
+        }
+
+        const onChainHash = String(onChainCert[1] || onChainCert.certificateHash || '');
+        if (documentHash && onChainHash && onChainHash.toLowerCase() !== documentHash.toLowerCase()) {
+            return res.status(400).json({
+                error: 'Hash mismatch',
+                details: `Submitted PDF SHA-256 hash (${documentHash}) does not match on-chain hash (${onChainHash}).`
+            });
+        }
+
+        // Save metadata to off-chain DB
         const db = getDb();
-        const issueDate = new Date().toISOString();
+        const issueDate = req.body.issueDate || new Date().toISOString();
+
         db.run(
-            'INSERT INTO certificates (id, studentName, courseName, issueDate, institutionId, status) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT OR REPLACE INTO certificates (id, studentName, courseName, issueDate, institutionId, status) VALUES (?, ?, ?, ?, ?, ?)',
             [certificateId, studentName, courseName, issueDate, institutionId, 'VALID'],
             async (err) => {
                 if (err) return res.status(500).json({ error: 'Database error', details: err.message });
-                
-                // Generate QR code for verification URL
-                // Assuming frontend is served on the same host
-                const verifyUrl = `${req.protocol}://${req.get('host')}/verify.html?id=${certificateId}`;
-                const qrCodeDataUrl = await qrcode.toDataURL(verifyUrl);
-                
+
+                const verifyUrl = `${req.protocol}://${req.get('host')}/verify?id=${certificateId}`;
+                let qrCodeDataUrl = null;
+                try {
+                    qrCodeDataUrl = await qrcode.toDataURL(verifyUrl);
+                } catch (e) {}
+
                 res.status(201).json({
-                    message: 'Certificate issued successfully',
+                    message: 'Certificate synchronized successfully',
                     certificateId,
-                    hash: documentHash,
+                    hash: onChainHash || documentHash,
                     qrCode: qrCodeDataUrl,
                     verifyUrl
                 });
             }
         );
     } catch (error) {
-        console.error('Issue error:', error);
-        res.status(500).json({ error: 'Failed to issue certificate', details: error.message || error });
+        console.error('Synchronization error:', error);
+        res.status(500).json({ error: 'Failed to synchronize certificate metadata', details: error.message || error });
     }
 };
 
