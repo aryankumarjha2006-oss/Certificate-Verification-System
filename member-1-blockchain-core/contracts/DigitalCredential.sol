@@ -64,4 +64,12 @@ contract DigitalCredential {
     ) external {
         certificateRegistry.createNewVersion(msg.sender, _institutionId, _certificateId, _newCertificateHash, _newExpiryTimestamp);
     }
+
+    function getCertificateVersion(string memory _certificateId, uint256 _version) external view returns (CertificateRegistry.Certificate memory) {
+        return certificateRegistry.getCertificateVersion(_certificateId, _version);
+    }
+
+    function getCertificateVersionCount(string memory _certificateId) external view returns (uint256) {
+        return certificateRegistry.getCertificateVersionCount(_certificateId);
+    }
 }
