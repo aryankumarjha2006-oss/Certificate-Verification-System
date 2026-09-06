@@ -38,11 +38,11 @@ export function HashDisplay({ value }) {
   if (!value) return null;
 
   return (
-    <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', width: 'fit-content'}}>
-      <span className="mono" style={{color: 'var(--text-muted)'}}>
+    <div style={{display: 'inline-flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', maxWidth: '100%', boxSizing: 'border-box'}}>
+      <span className="mono" style={{color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
         {value.length > 20 ? `${value.substring(0, 10)}...${value.substring(value.length - 8)}` : value}
       </span>
-      <button onClick={handleCopy} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)'}} title="Copy">
+      <button onClick={handleCopy} style={{background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)', flexShrink: 0}} title="Copy">
         {copied ? <Check size={14} color="var(--success)" /> : <Copy size={14} />}
       </button>
     </div>

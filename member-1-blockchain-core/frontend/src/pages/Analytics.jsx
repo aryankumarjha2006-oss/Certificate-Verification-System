@@ -98,7 +98,7 @@ export default function Analytics() {
             <StatCard title="Total Institutions" value={stats.totalInstitutions} icon={Users} color="var(--accent)" />
           </div>
 
-          <div style={{display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem'}}>
+          <div className="grid-2-1">
 
              <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><BarChart3 size={18}/> Issuance Trends</div>} style={{display: 'flex', flexDirection: 'column'}}>
                 <div style={{flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '300px', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', padding: '2rem', textAlign: 'center'}}>

@@ -102,7 +102,7 @@ export default function PublicVerification() {
           <div style={{marginTop: '2rem', width: '100%', background: 'var(--bg-card)', padding: '2rem', borderRadius: 'var(--radius-lg)', textAlign: 'left', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)'}}>
              <h3 style={{margin: '0 0 1.5rem 0'}}>Blockchain Proof</h3>
              <div style={{display: 'flex', flexDirection: 'column', gap: '1.25rem'}}>
-               <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+               <div className="grid-1-1" style={{gap: '1.5rem'}}>
                  <div>
                     <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Credential ID</div>
                     <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{result.details.id}</div>

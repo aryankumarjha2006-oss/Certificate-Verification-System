@@ -89,12 +89,27 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.3);
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   font-family: var(--font-main);
   background-color: var(--bg-main);
   color: var(--text-main);
   margin: 0;
   padding: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 

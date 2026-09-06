@@ -53,9 +53,9 @@ export function Header({ wallet, network, connect }) {
   return (
     <header className="header">
       <div className="header-left">
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '300px', border: '1px solid var(--border)' }}>
-          <Search size={16} style={{ marginRight: '0.5rem' }} />
-          <span style={{ fontSize: '0.9rem' }}>Global Search...</span>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '100%', maxWidth: '300px', border: '1px solid var(--border)' }}>
+          <Search size={16} style={{ marginRight: '0.5rem', flexShrink: 0 }} />
+          <span style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Global Search...</span>
         </div>
       </div>
       <div className="header-right">

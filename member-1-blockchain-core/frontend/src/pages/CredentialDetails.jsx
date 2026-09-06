@@ -78,7 +78,7 @@ export default function CredentialDetails() {
         </div>
       </div>
 
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem'}}>
+      <div className="grid-1-1">
 
           <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Clock size={18}/> Version Timeline</div>}>
              <div style={{position: 'relative', paddingLeft: '2rem', borderLeft: '2px solid var(--border)'}}>

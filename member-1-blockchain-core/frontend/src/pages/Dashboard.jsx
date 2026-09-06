@@ -70,7 +70,7 @@ export default function Dashboard() {
             <StatCard title="Issuers" value={stats?.issuers || 0} icon={Users} color="var(--secondary)" />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          <div className="grid-2-1">
             <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Activity size={18} /> Recent Credential Activity</div>}>
               {stats?.recent?.length === 0 ? (
                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>

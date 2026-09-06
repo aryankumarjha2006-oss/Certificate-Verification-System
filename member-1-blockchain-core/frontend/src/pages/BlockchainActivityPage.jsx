@@ -116,9 +116,9 @@ export default function BlockchainActivityPage() {
               <tbody>
                 {filtered.map((e, idx) => (
                   <tr key={idx}>
-                    <td>{getEventBadge(e.name)}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{getEventBadge(e.name)}</td>
                     <td className="mono" style={{fontWeight: 500, fontSize: '0.9rem'}}>{e.entity}</td>
-                    <td className="mono" style={{fontSize: '0.9rem'}}>Block {e.block}</td>
+                    <td className="mono" style={{fontSize: '0.9rem', whiteSpace: 'nowrap'}}>Block {e.block}</td>
                     <td><HashDisplay value={e.tx} /></td>
                   </tr>
                 ))}

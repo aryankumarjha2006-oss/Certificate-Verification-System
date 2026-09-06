@@ -66,7 +66,7 @@ export default function Home() {
 
       <main className="public-main">
         {/* Hero Section */}
-        <section style={{ padding: '6rem 4rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4rem', background: 'linear-gradient(135deg, var(--bg-main) 0%, var(--bg-card) 100%)' }}>
+        <section style={{ padding: '6rem 4rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4rem', flexWrap: 'wrap', background: 'linear-gradient(135deg, var(--bg-main) 0%, var(--bg-card) 100%)' }}>
           <div style={{ flex: 1, maxWidth: '600px' }}>
             <Badge type="primary" style={{ marginBottom: '1.5rem' }}>Enterprise Web3 Verification</Badge>
             <h1 style={{ fontSize: '4rem', lineHeight: 1.1, marginBottom: '1.5rem', color: 'var(--primary)', letterSpacing: '-0.025em' }}>
@@ -154,7 +154,7 @@ export default function Home() {
                  <CheckCircle size={20} /> Blockchain connection unavailable
                </div>
              ) : (
-               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2rem' }}>
+               <div className="grid-1-1-1">
                  <div>
                    <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Network</div>
                    <div style={{ fontWeight: 600 }}>{networkStatus}</div>
@@ -185,7 +185,7 @@ export default function Home() {
       </main>
 
       <footer className="public-footer">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', maxWidth: '1200px', margin: '0 auto', flexWrap: 'wrap', gap: '2rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <Shield size={24} color="var(--primary)" />

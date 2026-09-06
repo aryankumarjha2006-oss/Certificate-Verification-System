@@ -178,13 +178,13 @@ export default function Certificates() {
               <tbody>
                 {filtered.map((cert, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{cert.certId}</td>
+                    <td className="mono" style={{ fontWeight: 500 }}>{cert.certId}</td>
                     <td className="mono" style={{ fontSize: '0.85rem' }}>{cert.issuer.substring(0, 10)}...</td>
-                    <td>{cert.issueDate}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>{cert.issueDate}</td>
                     <td>
                       <Badge type={cert.status === 'ACTIVE' ? 'success' : 'danger'}>{cert.status}</Badge>
                     </td>
-                    <td style={{textAlign: 'right'}}>
+                    <td style={{textAlign: 'right', whiteSpace: 'nowrap'}}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                         <button className="btn btn-secondary" style={{ padding: '0.4rem 0.6rem' }} onClick={() => navigate(`/credentials/${cert.certId}`)} title="View Details">
                           <Eye size={16} />

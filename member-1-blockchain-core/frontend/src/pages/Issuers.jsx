@@ -145,7 +145,7 @@ export default function Issuers() {
               <tbody>
                 {filtered.map((iss, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{iss.instId}</td>
+                    <td className="mono" style={{ fontWeight: 500 }}>{iss.instId}</td>
                     <td className="mono" style={{ fontSize: '0.9rem' }}>{iss.wallet}</td>
                     <td>
                       <Badge type={iss.status === 'AUTHORIZED' ? 'success' : 'danger'}>{iss.status}</Badge>

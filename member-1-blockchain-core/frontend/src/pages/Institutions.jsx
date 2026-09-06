@@ -135,7 +135,7 @@ export default function Institutions() {
               <tbody>
                 {filtered.map((inst, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{inst.id}</td>
+                    <td className="mono" style={{ fontWeight: 500 }}>{inst.id}</td>
                     <td>{inst.name}</td>
                     <td className="mono" style={{ fontSize: '0.85rem' }}>{inst.wallet}</td>
                     <td><Badge type="success">{inst.status}</Badge></td>
