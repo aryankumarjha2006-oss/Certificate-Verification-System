@@ -12,6 +12,8 @@ export default function CredentialDetails() {
   const [loading, setLoading] = useState(true);
   const [selectedVersion, setSelectedVersion] = useState(null);
   const [compareVersion, setCompareVersion] = useState(null);
+  const [metadata, setMetadata] = useState(null);
+  const [proof, setProof] = useState(null);
 
   useEffect(() => {
     loadVersions();
@@ -22,6 +24,12 @@ export default function CredentialDetails() {
     try {
       setLoading(true);
       const count = await blockchainService.getCertificateVersionCount(id);
+
+      const meta = blockchainService.getCertificateMetadata(id);
+      setMetadata(meta);
+
+      const prf = await blockchainService.getCertificateProof(id);
+      setProof(prf);
 
       const vList = [];
       for (let i = Number(count); i >= 1; i--) {
@@ -127,28 +135,70 @@ export default function CredentialDetails() {
           <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
               <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><FileText size={18}/> Selected Version Details</div>}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
-                         <div>
-                            <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version Number</div>
-                            <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version} {currentVersionData.version === versions[0].version && "(Latest)"}</div>
-                         </div>
-                         <div>
-                            <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Status Code</div>
-                            <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.status}</div>
-                         </div>
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Document Hash</div>
-                        <HashDisplay value={currentVersionData.hash} />
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer Wallet</div>
-                        <HashDisplay value={currentVersionData.issuer} />
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Expiry Date</div>
-                        <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.expiry > 0 ? new Date(currentVersionData.expiry * 1000).toLocaleDateString() : 'Never'}</div>
-                     </div>
+                      {metadata?.studentName && (
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                            <div>
+                               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Student Name</div>
+                               <div style={{fontWeight: 700, fontSize: '1.15rem'}}>{metadata.studentName}</div>
+                            </div>
+                            <div>
+                               <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Purpose / Degree</div>
+                               <div style={{fontWeight: 600, fontSize: '1rem'}}>{metadata.purpose}</div>
+                            </div>
+                        </div>
+                      )}
+
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version Number</div>
+                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version} {currentVersionData.version === versions[0].version && "(Latest)"}</div>
+                          </div>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Status</div>
+                             <div>
+                               <Badge type={currentVersionData.status === 0 ? 'success' : 'danger'}>
+                                 {currentVersionData.status === 0 ? 'ACTIVE' : 'REVOKED'}
+                               </Badge>
+                             </div>
+                          </div>
+                      </div>
+
+                      {(proof?.blockNumber || metadata?.blockNumber) && (
+                        <div>
+                           <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Mined Block Number</div>
+                           <div style={{fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)'}}>
+                             Block #{proof?.blockNumber || metadata?.blockNumber}
+                           </div>
+                        </div>
+                      )}
+
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Document Content Hash</div>
+                         <HashDisplay value={currentVersionData.hash} />
+                      </div>
+
+                      {(proof?.transactionHash || metadata?.transactionHash) && (
+                        <div>
+                           <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Blockchain Transaction Hash</div>
+                           <HashDisplay value={proof?.transactionHash || metadata?.transactionHash} />
+                        </div>
+                      )}
+
+                      {(proof?.blockHash || metadata?.blockHash) && (
+                        <div>
+                           <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Blockchain Block Hash</div>
+                           <HashDisplay value={proof?.blockHash || metadata?.blockHash} />
+                        </div>
+                      )}
+
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer Wallet</div>
+                         <HashDisplay value={currentVersionData.issuer} />
+                      </div>
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Expiry Date</div>
+                         <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.expiry > 0 ? new Date(currentVersionData.expiry * 1000).toLocaleDateString() : 'Never'}</div>
+                      </div>
                   </div>
               </Card>
 

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, Modal } from '../components/common/Components';
 import { LoadingState, EmptyState, TransactionStatus, Toast } from '../components/common/UIStates';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Search, Users, Award } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
+import { useNavigate } from 'react-router-dom';
 
 export default function Issuers() {
+  const navigate = useNavigate();
   const [issuers, setIssuers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -100,9 +102,14 @@ export default function Issuers() {
           <h1 className="page-title">Authorized Issuers</h1>
           <p className="page-subtitle">Manage personnel authorized to issue credentials on behalf of institutions.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={18} /> Authorize Issuer
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" onClick={() => navigate('/generate')}>
+            <Award size={18} /> Generate Certificate
+          </button>
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={18} /> Authorize Issuer
+          </button>
+        </div>
       </div>
 
       {toast && <Toast title={toast.title} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

@@ -10,6 +10,7 @@ import PublicVerification from './pages/PublicVerification';
 import CredentialDetails from './pages/CredentialDetails';
 import Analytics from './pages/Analytics';
 import Issuers from './pages/Issuers';
+import GenerateCertificate from './pages/GenerateCertificate';
 import Settings from './pages/Settings';
 import BlockchainLoader from './components/common/BlockchainLoader';
 import btcCoin from './assets/bitcoin-coin.jpg';
@@ -103,6 +104,7 @@ function App() {
               <Route path="/institutions" element={<Institutions />} />
               <Route path="/credentials" element={<Certificates />} />
               <Route path="/credentials/:id" element={<CredentialDetails />} />
+              <Route path="/generate" element={<GenerateCertificate wallet={wallet} connect={connect} />} />
               <Route path="/activity" element={<BlockchainActivityPage />} />
               <Route path="/issuers" element={<Issuers />} />
               <Route path="/settings" element={<Settings network={network} />} />

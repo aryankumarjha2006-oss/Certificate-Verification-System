@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { Card, HashDisplay } from '../components/common/Components';
+import React, { useState, useEffect } from 'react';
+import { Card, Badge, HashDisplay } from '../components/common/Components';
 import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 
 export default function PublicVerification({ theme, toggleTheme }) {
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({ certId: '', hash: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -19,46 +20,75 @@ export default function PublicVerification({ theme, toggleTheme }) {
     }
   };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
+  const executeVerification = async (certId, hash) => {
     try {
       setLoading(true);
       setResult(null);
 
-      const rawStatus = await blockchainService.verifyCertificate(form.certId, form.hash);
+      const rawStatus = await blockchainService.verifyCertificate(certId, hash);
       const statuses = ["NOT_FOUND", "VALID", "TAMPERED", "REVOKED", "EXPIRED"];
       const statusText = typeof rawStatus === 'number' ? (statuses[rawStatus] || "NOT_FOUND") : (rawStatus || "NOT_FOUND");
 
       let version = "-";
       let details = null;
       if (statusText !== "NOT_FOUND") {
-          try {
-              const vCount = await blockchainService.getCertificateVersionCount(form.certId);
-              version = vCount?.toString() || "-";
-              const cert = await blockchainService.getCertificate(form.certId);
-              if (cert && cert.certificateId === form.certId) {
-                  details = {
-                      id: cert.certificateId,
-                      hash: cert.certificateHash,
-                      issuer: cert.issuer,
-                      expiry: cert.expiryTimestamp.toString(),
-                      status: cert.status,
-                      version: cert.version.toString()
-                  };
-              }
-          } catch(err) {
-              console.log("Could not fetch details", err);
+        try {
+          const vCount = await blockchainService.getCertificateVersionCount(certId);
+          version = vCount?.toString() || "-";
+          const cert = await blockchainService.getCertificate(certId);
+          const meta = blockchainService.getCertificateMetadata(certId);
+          const proof = await blockchainService.getCertificateProof(certId);
+
+          if (cert && cert.certificateId === certId) {
+            details = {
+              id: cert.certificateId,
+              hash: cert.certificateHash,
+              issuer: cert.issuer,
+              expiry: cert.expiryTimestamp.toString(),
+              status: cert.status,
+              version: cert.version.toString(),
+              institutionId: cert.institutionId || meta?.institutionId || '',
+              studentName: meta?.studentName || '',
+              purpose: meta?.purpose || '',
+              txHash: proof?.transactionHash || meta?.transactionHash || '',
+              blockNumber: proof?.blockNumber || meta?.blockNumber || '',
+              blockHash: proof?.blockHash || meta?.blockHash || ''
+            };
           }
+        } catch(err) {
+          console.log("Could not fetch details", err);
+        }
       }
 
       setResult({ status: statusText, version: version?.toString() || "-", details });
-
     } catch (err) {
       console.error(err);
       setResult({ status: "ERROR", message: err.message });
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check URL search parameters (e.g. from QR code scan)
+  useEffect(() => {
+    const idParam = searchParams.get('id') || searchParams.get('certId');
+    const hashParam = searchParams.get('hash');
+
+    if (idParam) {
+      setForm(prev => ({
+        certId: idParam,
+        hash: hashParam || prev.hash
+      }));
+
+      if (hashParam) {
+        executeVerification(idParam, hashParam);
+      }
+    }
+  }, [searchParams]);
+
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    executeVerification(form.certId.trim(), form.hash.trim());
   };
 
   const getStatusDisplay = () => {
@@ -109,8 +139,25 @@ export default function PublicVerification({ theme, toggleTheme }) {
 
         {result.status === "VALID" && result.details && (
           <div style={{marginTop: '2rem', width: '100%', background: 'var(--bg-card)', padding: '2rem', borderRadius: 'var(--radius-lg)', textAlign: 'left', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)'}}>
-             <h3 style={{margin: '0 0 1.5rem 0'}}>Blockchain Proof</h3>
+             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem'}}>
+               <h3 style={{margin: 0}}>Blockchain Proof</h3>
+               <Badge type="success">CRYPTOGRAPHICALLY VERIFIED</Badge>
+             </div>
+
              <div style={{display: 'flex', flexDirection: 'column', gap: '1.25rem'}}>
+               {result.details.studentName && (
+                 <div className="grid-1-1" style={{gap: '1.5rem'}}>
+                   <div>
+                      <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Student Name</div>
+                      <div style={{fontWeight: 700, fontSize: '1.1rem'}}>{result.details.studentName}</div>
+                   </div>
+                   <div>
+                      <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Purpose / Degree</div>
+                      <div style={{fontWeight: 600, fontSize: '1rem'}}>{result.details.purpose}</div>
+                   </div>
+                 </div>
+               )}
+
                <div className="grid-1-1" style={{gap: '1.5rem'}}>
                  <div>
                     <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Credential ID</div>
@@ -118,19 +165,48 @@ export default function PublicVerification({ theme, toggleTheme }) {
                  </div>
                  <div>
                     <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version</div>
-                    <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{result.details.version}</div>
+                    <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {result.details.version}</div>
                  </div>
                </div>
 
+               {result.details.blockNumber && (
+                 <div className="grid-1-1" style={{gap: '1.5rem'}}>
+                   <div>
+                      <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Mined Block Number</div>
+                      <div style={{fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)'}}>Block #{result.details.blockNumber}</div>
+                   </div>
+                   {result.details.institutionId && (
+                     <div>
+                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Institution ID</div>
+                        <div style={{fontWeight: 600, fontSize: '1rem'}}>{result.details.institutionId}</div>
+                     </div>
+                   )}
+                 </div>
+               )}
+
                <div>
-                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer</div>
+                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer Wallet</div>
                   <HashDisplay value={result.details.issuer} />
                </div>
 
                <div>
-                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Trusted Blockchain Hash</div>
+                  <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Trusted Blockchain Content Hash</div>
                   <HashDisplay value={result.details.hash} />
                </div>
+
+               {result.details.txHash && (
+                 <div>
+                    <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Blockchain Transaction Hash</div>
+                    <HashDisplay value={result.details.txHash} />
+                 </div>
+               )}
+
+               {result.details.blockHash && (
+                 <div>
+                    <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Blockchain Block Hash</div>
+                    <HashDisplay value={result.details.blockHash} />
+                 </div>
+               )}
 
                <hr style={{border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0'}} />
 

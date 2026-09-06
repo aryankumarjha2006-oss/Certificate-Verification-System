@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, HashDisplay, Modal } from '../components/common/Components';
 import { LoadingState, EmptyState, TransactionStatus, Toast } from '../components/common/UIStates';
-import { Plus, Search, Eye, Ban, History, FileCheck } from 'lucide-react';
+import { Plus, Search, Eye, Ban, History, FileCheck, Award } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { useNavigate } from 'react-router-dom';
 
 export default function Certificates() {
+  const navigate = useNavigate();
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,7 +20,6 @@ export default function Certificates() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({ instId: '', certId: '', hash: '', expiry: '' });
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadCredentials();
@@ -34,11 +34,16 @@ export default function Certificates() {
       // We map the issued events, check if they are in revoked
       const revokedSet = new Set(data.revoked.map(r => r.certId));
 
-      const enriched = data.issued.map(cert => ({
-        ...cert,
-        status: revokedSet.has(cert.certId) ? 'REVOKED' : 'ACTIVE',
-        issueDate: new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
-      }));
+      const enriched = data.issued.map(cert => {
+        const meta = blockchainService.getCertificateMetadata(cert.certId);
+        return {
+          ...cert,
+          studentName: meta?.studentName || '',
+          purpose: meta?.purpose || '',
+          status: revokedSet.has(cert.certId) ? 'REVOKED' : 'ACTIVE',
+          issueDate: new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
+        };
+      });
 
       setCredentials(enriched);
     } catch (err) {
@@ -83,9 +88,8 @@ export default function Certificates() {
     }
   };
 
-  const handleRevoke = async (certId) => {
-    const instId = prompt(`Enter Institution ID to revoke credential ${certId}:`);
-    if (!instId) return;
+  const handleRevoke = async (instId, certId) => {
+    if (!window.confirm(`Are you sure you want to revoke credential ${certId}?`)) return;
 
     try {
       setTxStatus('waiting-wallet');
@@ -112,7 +116,8 @@ export default function Certificates() {
 
   const filtered = credentials.filter(c =>
     c.certId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.issuer.toLowerCase().includes(searchTerm.toLowerCase())
+    c.issuer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (c.studentName && c.studentName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -122,9 +127,14 @@ export default function Certificates() {
           <h1 className="page-title">Credentials</h1>
           <p className="page-subtitle">Manage issuance, revocation, and versions of digital credentials.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setIsModalOpen(true)}>
-          <Plus size={18} /> Issue Credential
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => navigate('/generate')}>
+            <Award size={18} /> Generate Certificate
+          </button>
+          <button className="btn btn-secondary" onClick={() => setIsModalOpen(true)}>
+            <Plus size={18} /> Manual Hash
+          </button>
+        </div>
       </div>
 
       {toast && (

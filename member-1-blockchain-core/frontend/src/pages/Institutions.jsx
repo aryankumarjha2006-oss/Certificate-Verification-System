@@ -24,20 +24,7 @@ export default function Institutions() {
     try {
       if (!blockchainService.provider) return;
       setLoading(true);
-      const instReg = blockchainService.institutionRegistry;
-      const filter = instReg.filters.InstitutionRegistered();
-      const events = await instReg.queryFilter(filter, 0, "latest");
-
-      const loaded = events.map(e => {
-        const idRaw = e.args[0];
-        const safeId = typeof idRaw === 'string' ? idRaw : (idRaw?.hash || String(idRaw));
-        return {
-          id: safeId,
-          name: e.args[1] || 'Unknown',
-          wallet: e.args[2] || '0x000',
-          status: 'ACTIVE'
-        };
-      });
+      const loaded = await blockchainService.getAllInstitutions();
       setInstitutions(loaded);
     } catch (err) {
       console.error(err);

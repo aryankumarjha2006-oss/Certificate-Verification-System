@@ -1,12 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle, Sun, Moon } from 'lucide-react';
+import { Shield, LayoutDashboard, FileText, Award, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle, Sun, Moon } from 'lucide-react';
 import { Badge } from '../common/Components';
 
 export function Sidebar() {
   const navItems = [
     { to: "/dashboard", icon: LayoutDashboard, label: "Overview" },
     { to: "/credentials", icon: FileText, label: "Credentials" },
+    { to: "/generate", icon: Award, label: "Generate Certificate" },
     { to: "/institutions", icon: Building2, label: "Institutions" },
     { to: "/issuers", icon: Users, label: "Issuers" },
     { to: "/verify", icon: Search, label: "Verification" },
