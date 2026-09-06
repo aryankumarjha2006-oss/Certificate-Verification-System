@@ -19,7 +19,7 @@ export default function Settings({ network }) {
         <p className="page-subtitle">Manage application preferences and security settings.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div className="grid-1-1" style={{ gap: '2rem' }}>
         <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Monitor size={18}/> Appearance</div>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div>

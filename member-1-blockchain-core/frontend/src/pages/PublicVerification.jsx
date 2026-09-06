@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { Card, HashDisplay } from '../components/common/Components';
-import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Upload, FileText } from 'lucide-react';
+import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Upload, FileText, Sun, Moon } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ethers } from 'ethers';
 
-export default function PublicVerification() {
+export default function PublicVerification({ theme, toggleTheme }) {
   const [searchParams] = useSearchParams();
   const [certId, setCertId] = useState(searchParams.get('id') || searchParams.get('certId') || '');
   const [selectedFile, setSelectedFile] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleBack = () => {
+    if (location.state?.from === 'home') {
+      navigate('/');
+    } else {
+      navigate('/dashboard');
+    }
+  };
 
   useEffect(() => {
     const idFromUrl = searchParams.get('id') || searchParams.get('certId');
@@ -200,9 +209,22 @@ export default function PublicVerification() {
           <Shield size={32} color="var(--primary)" />
           <h1 style={{ margin: 0, fontSize: '1.75rem', letterSpacing: '-0.025em' }}>CredChain</h1>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ border: 'none', background: 'transparent' }}>
-          <ArrowLeft size={18} /> Back to Home
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={handleBack} style={{ border: 'none', background: 'transparent' }}>
+            <ArrowLeft size={18} /> Back to Home
+          </button>
+        </div>
       </header>
 
       <main className="public-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem' }}>
