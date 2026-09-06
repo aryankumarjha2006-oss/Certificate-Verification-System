@@ -36,8 +36,10 @@ export default function Certificates() {
 
       const enriched = data.issued.map(cert => ({
         ...cert,
-        status: revokedSet.has(cert.certId) ? 'REVOKED' : 'ACTIVE',
-        issueDate: new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
+        status: revokedSet.has(cert.certId) || cert.status === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
+        issueDate: cert.timestamp && Number(cert.timestamp) > 0
+          ? new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
+          : '—'
       }));
 
       setCredentials(enriched);
@@ -69,6 +71,14 @@ export default function Certificates() {
 
       await tx.wait();
       setTxStatus('confirmed');
+
+      try {
+        const local = JSON.parse(localStorage.getItem('credchain_local_certs') || '[]');
+        if (!local.find(c => c.id === formData.certId)) {
+          local.push({ id: formData.certId, institutionId: formData.instId });
+          localStorage.setItem('credchain_local_certs', JSON.stringify(local));
+        }
+      } catch (e) {}
 
       setToast({
         type: 'success',

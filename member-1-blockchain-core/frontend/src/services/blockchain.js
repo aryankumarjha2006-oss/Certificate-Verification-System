@@ -106,55 +106,103 @@ class BlockchainService {
   }
 
   async getCertificate(certId) {
-    if (!this.digitalCredential) throw new Error("Wallet not connected");
-    return await this.digitalCredential.getCertificate(certId);
+    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+    return await contract.getCertificate(certId);
   }
 
   async getCertificateVersion(certId, version) {
-    if (!this.digitalCredential) throw new Error("Wallet not connected");
-    return await this.digitalCredential.getCertificateVersion(certId, version);
+    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+    return await contract.getCertificateVersion(certId, version);
   }
 
   async getCertificateVersionCount(certId) {
-    if (!this.digitalCredential) throw new Error("Wallet not connected");
-    return await this.digitalCredential.getCertificateVersionCount(certId);
+    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+    return await contract.getCertificateVersionCount(certId);
   }
 
-  // Event parsing for Dashboard
+  async getCredentials() {
+    let certList = [];
+    try {
+      const res = await fetch('http://localhost:3000/api/certificates');
+      if (res.ok) {
+        certList = await res.json();
+      }
+    } catch (e) {
+      console.warn("Could not fetch off-chain certificates, falling back to local/contract state", e);
+    }
+
+    try {
+      const local = JSON.parse(localStorage.getItem('credchain_local_certs') || '[]');
+      for (const lc of local) {
+        if (!certList.find(c => c.id === lc.id)) {
+          certList.push(lc);
+        }
+      }
+    } catch (e) {}
+
+    const enriched = [];
+    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+
+    for (const cert of certList) {
+      const certId = cert.id;
+      if (!certId) continue;
+      try {
+        const onChain = await contract.getCertificate(certId);
+        if (onChain && (onChain[7] ?? onChain.exists)) {
+          const issueTimestamp = Number(onChain[3] ?? onChain.issueTimestamp ?? 0);
+          const expiryTimestamp = Number(onChain[4] ?? onChain.expiryTimestamp ?? 0);
+          const statusNum = Number(onChain[5] ?? onChain.status ?? 0);
+          const versionNum = Number(onChain[6] ?? onChain.version ?? 1);
+
+          enriched.push({
+            certId: String(onChain[0] || certId),
+            issuer: String(onChain[2] || onChain.issuer || '0x000'),
+            issueTimestamp,
+            expiryTimestamp,
+            status: statusNum === 1 ? 'REVOKED' : 'ACTIVE',
+            version: versionNum,
+            institutionId: String(onChain[8] || onChain.institutionId || cert.institutionId || ''),
+            hash: String(onChain[1] || onChain.certificateHash || '')
+          });
+        }
+      } catch (err) {
+        console.warn(`Certificate ${certId} in database not found on current active blockchain; skipping.`);
+      }
+    }
+
+    return enriched;
+  }
+
+  // Event and credentials parsing for Dashboard & Lists
   async getAllEvents() {
-    if (!this.provider || !this.digitalCredential) return { certEvents: [], instEvents: [] };
-    const certRegAddress = await this.digitalCredential.certificateRegistry();
-    const certReg = new ethers.Contract(certRegAddress, [
-      "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
-      "event CertificateRevoked(string indexed certificateId)",
-      "event CertificateVersionCreated(string indexed certificateId, string newCertificateHash, uint256 newExpiryTimestamp, uint256 newVersion)"
-    ], this.provider);
+    if (!this.provider || !this.digitalCredential) return { issued: [], revoked: [], institutions: 0 };
 
-    const instEventsFilter = this.institutionRegistry.filters.InstitutionRegistered();
-    const instEvents = await this.institutionRegistry.queryFilter(instEventsFilter, 0, "latest");
+    let institutionsCount = 0;
+    try {
+      const instEventsFilter = this.institutionRegistry.filters.InstitutionRegistered();
+      const instEvents = await this.institutionRegistry.queryFilter(instEventsFilter, 0, "latest");
+      institutionsCount = instEvents.length;
+    } catch (e) {}
 
-    const certIssuedFilter = certReg.filters.CertificateIssued();
-    const certRevokedFilter = certReg.filters.CertificateRevoked();
+    const credentials = await this.getCredentials();
 
-    const issuedEvents = await certReg.queryFilter(certIssuedFilter, 0, "latest");
-    const revokedEvents = await certReg.queryFilter(certRevokedFilter, 0, "latest");
+    const issued = credentials.map(c => ({
+      certId: c.certId,
+      issuer: c.issuer,
+      timestamp: c.issueTimestamp,
+      status: c.status,
+      version: c.version,
+      institutionId: c.institutionId
+    }));
 
-    const parseArg = (val) => {
-      if (typeof val === 'string') return val;
-      if (val && typeof val === 'object' && val.hash) return val.hash;
-      return String(val ?? '');
-    };
+    const revoked = credentials.filter(c => c.status === 'REVOKED').map(c => ({
+      certId: c.certId
+    }));
 
     return {
-       issued: issuedEvents.map(e => ({
-           certId: parseArg(e.args[0]),
-           issuer: parseArg(e.args[2]),
-           timestamp: e.args[3] ? String(e.args[3]) : '0'
-       })),
-       revoked: revokedEvents.map(e => ({
-           certId: parseArg(e.args[0])
-       })),
-       institutions: instEvents.length
+       issued,
+       revoked,
+       institutions: institutionsCount
     };
   }
 

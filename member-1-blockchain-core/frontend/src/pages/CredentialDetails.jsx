@@ -18,38 +18,60 @@ export default function CredentialDetails() {
   }, [id, blockchainService.provider]);
 
   const loadVersions = async () => {
-    if (!blockchainService.provider) return;
+    if (!id) return;
     try {
       setLoading(true);
-      const count = await blockchainService.getCertificateVersionCount(id);
+      let mainCert = null;
+      try {
+        mainCert = await blockchainService.getCertificate(id);
+      } catch (err) {
+        console.warn("getCertificate failed for ID:", id, err);
+      }
 
+      if (!mainCert || !(mainCert[7] ?? mainCert.exists)) {
+        setVersions([]);
+        setLoading(false);
+        return;
+      }
+
+      const versionCount = Number(mainCert[6] ?? mainCert.version ?? 1);
       const vList = [];
-      for (let i = Number(count); i >= 1; i--) {
-        const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-        const certReg = new window.ethers.Contract(certRegAddress, [
-          "function getCertificateVersion(string memory, uint256) external view returns (tuple(string certificateId, string certificateHash, address issuer, uint256 expiryTimestamp, uint8 status, uint256 version))"
-        ], blockchainService.provider);
 
+      for (let i = versionCount; i >= 1; i--) {
         try {
-          const vData = await certReg.getCertificateVersion(id, i);
+          const vData = await blockchainService.getCertificateVersion(id, i);
           vList.push({
-            version: Number(vData[5]),
-            hash: vData[1],
-            issuer: vData[2],
-            expiry: Number(vData[3]),
-            status: Number(vData[4])
+            version: Number(vData[6] ?? vData.version ?? i),
+            hash: String(vData[1] ?? vData.certificateHash ?? ''),
+            issuer: String(vData[2] ?? vData.issuer ?? ''),
+            issueTimestamp: Number(vData[3] ?? vData.issueTimestamp ?? 0),
+            expiry: Number(vData[4] ?? vData.expiryTimestamp ?? 0),
+            status: Number(vData[5] ?? vData.status ?? 0) === 1 ? 'REVOKED' : 'ACTIVE',
+            institutionId: String(vData[8] ?? vData.institutionId ?? '')
           });
         } catch(e) {
           console.error("Failed to load version", i, e);
+          if (i === versionCount || vList.length === 0) {
+            vList.push({
+              version: Number(mainCert[6] ?? mainCert.version ?? 1),
+              hash: String(mainCert[1] ?? mainCert.certificateHash ?? ''),
+              issuer: String(mainCert[2] ?? mainCert.issuer ?? ''),
+              issueTimestamp: Number(mainCert[3] ?? mainCert.issueTimestamp ?? 0),
+              expiry: Number(mainCert[4] ?? mainCert.expiryTimestamp ?? 0),
+              status: Number(mainCert[5] ?? mainCert.status ?? 0) === 1 ? 'REVOKED' : 'ACTIVE',
+              institutionId: String(mainCert[8] ?? mainCert.institutionId ?? '')
+            });
+          }
         }
       }
 
       setVersions(vList);
       if (vList.length > 0) {
-          setSelectedVersion(vList[0].version);
+        setSelectedVersion(vList[0].version);
       }
     } catch (err) {
       console.error(err);
+      setVersions([]);
     } finally {
       setLoading(false);
     }
@@ -132,28 +154,40 @@ export default function CredentialDetails() {
           <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
               <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><FileText size={18}/> Selected Version Details</div>}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                     <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
-                         <div>
-                            <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version Number</div>
-                            <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version} {currentVersionData.version === versions[0].version && "(Latest)"}</div>
-                         </div>
-                         <div>
-                            <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Status Code</div>
-                            <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.status}</div>
-                         </div>
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Document Hash</div>
-                        <HashDisplay value={currentVersionData.hash} />
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer Wallet</div>
-                        <HashDisplay value={currentVersionData.issuer} />
-                     </div>
-                     <div>
-                        <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Expiry Date</div>
-                        <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.expiry > 0 ? new Date(currentVersionData.expiry * 1000).toLocaleDateString() : 'Never'}</div>
-                     </div>
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version Number</div>
+                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version} {currentVersionData.version === versions[0].version && "(Latest)"}</div>
+                          </div>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Status</div>
+                             <div style={{marginTop: '0.25rem'}}>
+                               <Badge type={currentVersionData.status === 'ACTIVE' ? 'success' : 'danger'}>{currentVersionData.status}</Badge>
+                             </div>
+                          </div>
+                      </div>
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Institution ID</div>
+                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.institutionId || '—'}</div>
+                          </div>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issue Date</div>
+                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.issueTimestamp > 0 ? new Date(currentVersionData.issueTimestamp * 1000).toLocaleDateString() : '—'}</div>
+                          </div>
+                      </div>
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Document Hash</div>
+                         <HashDisplay value={currentVersionData.hash} />
+                      </div>
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Issuer Wallet</div>
+                         <HashDisplay value={currentVersionData.issuer} />
+                      </div>
+                      <div>
+                         <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Expiry Date</div>
+                         <div style={{fontWeight: 600, fontSize: '1.1rem'}}>{currentVersionData.expiry > 0 ? new Date(currentVersionData.expiry * 1000).toLocaleDateString() : 'Never'}</div>
+                      </div>
                   </div>
               </Card>
 

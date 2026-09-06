@@ -5,6 +5,7 @@ import {
     verifyCertificate,
     revokeCertificate,
     createNewVersion,
+    getAllCertificates,
     getCertificateInfo,
     getVerificationLogs
 } from '../controllers/certificateController.js';
@@ -23,6 +24,7 @@ router.get('/:id/audit', authenticateToken, getVerificationLogs);
 
 // Public routes (read-only verification)
 router.post('/verify', upload.single('pdf'), verifyCertificate);
+router.get('/', getAllCertificates);
 router.get('/:id', getCertificateInfo);
 
 export default router;

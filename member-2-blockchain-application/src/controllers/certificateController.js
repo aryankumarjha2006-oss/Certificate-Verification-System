@@ -163,6 +163,14 @@ export const createNewVersion = async (req, res) => {
     }
 };
 
+export const getAllCertificates = (req, res) => {
+    const db = getDb();
+    db.all('SELECT id, institutionId, issueDate, status FROM certificates ORDER BY rowid DESC', [], (err, rows) => {
+        if (err) return res.status(500).json({ error: 'Database error fetching certificates', details: err.message });
+        res.json(rows || []);
+    });
+};
+
 export const getCertificateInfo = (req, res) => {
     const { id } = req.params;
     const db = getDb();
