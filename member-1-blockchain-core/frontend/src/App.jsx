@@ -14,7 +14,7 @@ import Verification from './pages/Verification';
 import Settings from './pages/Settings';
 import BlockchainLoader from './components/common/BlockchainLoader';
 import btcCoin from './assets/bitcoin-coin.jpg';
-import { blockchainService } from './services/blockchain';
+import { blockchainService, getInjectedEthereumProvider } from './services/blockchain';
 
 import './styles/tokens.css';
 import './styles/layout.css';
@@ -42,14 +42,23 @@ function App() {
       setWallet(data.address);
       setNetwork(data.network);
     } catch (err) {
-      console.error(err);
-      alert(`Failed to connect wallet: ${err.message || err}`);
+      console.error('Wallet connection error:', err);
+      alert(err.message || "Failed to connect wallet.");
     }
   };
 
   useEffect(() => {
+    const iv = setInterval(() => {
+      setProgress(p => Math.min(p + 2, 100));
+    }, 50);
+    return () => clearInterval(iv);
+  }, []);
+
+  useEffect(() => {
+    const ethereum = getInjectedEthereumProvider();
+
     const init = async () => {
-      if (window.ethereum && window.ethereum.selectedAddress) {
+      if (ethereum && (ethereum.selectedAddress || (ethereum.accounts && ethereum.accounts.length > 0))) {
         try {
           await connect();
         } catch (e) {
@@ -59,25 +68,20 @@ function App() {
     };
     init();
 
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', () => {
-        connect();
-      });
-      window.ethereum.on('chainChanged', () => {
-        window.location.reload();
-      });
-    }
+    if (ethereum && ethereum.on) {
+      const handleAccounts = () => connect();
+      const handleChain = () => window.location.reload();
 
-    const iv = setInterval(() => {
-      setProgress(p => Math.min(p + 2, 100));
-    }, 50);
-    return () => {
-      clearInterval(iv);
-      if (window.ethereum) {
-        window.ethereum.removeAllListeners('accountsChanged');
-        window.ethereum.removeAllListeners('chainChanged');
-      }
-    };
+      ethereum.on('accountsChanged', handleAccounts);
+      ethereum.on('chainChanged', handleChain);
+
+      return () => {
+        if (ethereum.removeListener) {
+          ethereum.removeListener('accountsChanged', handleAccounts);
+          ethereum.removeListener('chainChanged', handleChain);
+        }
+      };
+    }
   }, []);
 
   if (isInitializing) {

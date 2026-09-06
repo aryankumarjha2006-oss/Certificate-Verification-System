@@ -9,6 +9,21 @@ export const CONTRACT_ADDRESSES = {
   digitalCredential: import.meta.env.VITE_DIGITAL_CREDENTIAL_ADDRESS || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 };
 
+export function getInjectedEthereumProvider() {
+  if (typeof window === "undefined") return null;
+
+  if (window.ethereum) {
+    if (Array.isArray(window.ethereum.providers) && window.ethereum.providers.length > 0) {
+      const metaMask = window.ethereum.providers.find(p => p.isMetaMask);
+      if (metaMask) return metaMask;
+      return window.ethereum.providers[0];
+    }
+    return window.ethereum;
+  }
+
+  return null;
+}
+
 class BlockchainService {
   constructor() {
     this.provider = new ethers.JsonRpcProvider("http://127.0.0.1:8545");
@@ -26,11 +41,21 @@ class BlockchainService {
   }
 
   async connectWallet() {
-    if (typeof window.ethereum === "undefined") {
-      throw new Error("MetaMask is not installed!");
+    const ethereum = getInjectedEthereumProvider();
+    if (!ethereum) {
+      throw new Error("No Web3 wallet extension detected. Please install MetaMask to connect your wallet.");
     }
-    await window.ethereum.request({ method: "eth_requestAccounts" });
-    this.provider = new ethers.BrowserProvider(window.ethereum);
+
+    try {
+      await ethereum.request({ method: "eth_requestAccounts" });
+    } catch (err) {
+      if (err && (err.code === 4001 || err.code === 'ACTION_REJECTED' || (err.message && err.message.includes('rejected')))) {
+        throw new Error("Wallet connection request was rejected in MetaMask.");
+      }
+      throw new Error(err.message || "Failed to request accounts from wallet.");
+    }
+
+    this.provider = new ethers.BrowserProvider(ethereum);
     this.signer = await this.provider.getSigner();
 
     this.digitalCredential = new ethers.Contract(
@@ -49,7 +74,7 @@ class BlockchainService {
 
     let netName = "Unknown Network";
     try {
-      const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainIdHex = await ethereum.request({ method: 'eth_chainId' });
       const chainId = parseInt(chainIdHex, 16);
 
       if (chainId === 31337) {
