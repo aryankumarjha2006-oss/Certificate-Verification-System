@@ -12,10 +12,18 @@
 
   --primary: #0f172a; /* Deep Navy */
   --primary-hover: #1e293b;
-  --secondary: #3b82f6; /* Professional Blue */
-  --secondary-hover: #2563eb;
+  --secondary: #2563eb; /* Professional Blue */
+  --secondary-hover: #1d4ed8;
+
   --accent: #0284c7; /* Professional Cyan/Blue */
   --accent-light: #e0f2fe;
+  --accent-text: #0369a1;
+  --accent-border: #bae6fd;
+
+  --info: #0284c7;
+  --info-bg: #e0f2fe;
+  --info-text: #0369a1;
+  --info-border: #bae6fd;
 
   --success: #059669;
   --success-bg: #d1fae5;
@@ -68,8 +76,16 @@
   --primary-hover: #E5E7EB;
   --secondary: #3B82F6;
   --secondary-hover: #2563EB;
-  --accent: #20242B;
-  --accent-light: rgba(255, 255, 255, 0.08);
+
+  --accent: #38BDF8; /* Bright Sky Blue for Dark Theme Icons/Accents */
+  --accent-light: rgba(56, 189, 248, 0.16); /* Translucent Blue Surface */
+  --accent-text: #38BDF8; /* High-Contrast Sky Blue Text */
+  --accent-border: rgba(56, 189, 248, 0.3);
+
+  --info: #38BDF8;
+  --info-bg: rgba(56, 189, 248, 0.16);
+  --info-text: #38BDF8;
+  --info-border: rgba(56, 189, 248, 0.3);
 
   --success: #10B981;
   --success-bg: rgba(16, 185, 129, 0.15);

@@ -6,6 +6,7 @@ import { initializeDatabase } from './src/config/database.js';
 import certificateRoutes from './src/routes/certificateRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import analyticsRoutes from './src/routes/analyticsRoutes.js';
+import auditRoutes from './src/routes/auditRoutes.js';
 import { startEventSynchronizer } from './src/services/eventListener.js';
 
 dotenv.config();
@@ -21,6 +22,7 @@ app.use(express.static('public'));
 app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/audit', auditRoutes);
 
 const PORT = process.env.PORT || 3000;
 
