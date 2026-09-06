@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Institution Dashboard - Certificate Manager</title>
+    <style>
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f4f6f8; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 850px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        h1 { color: #2c3e50; margin-top: 0; }
+        h2 { color: #34495e; margin-top: 25px; border-bottom: 2px solid #edf2f7; padding-bottom: 8px; }
+        .auth-bar { background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+        .auth-bar input { padding: 8px; margin-right: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .card { background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 8px; padding: 20px; margin-bottom: 25px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #4a5568; font-size: 14px; }
+        input[type="text"], input[type="password"], input[type="file"], input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 20px; font-size: 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-warning { background-color: #f39c12; }
+        .btn-warning:hover { background-color: #d68910; }
+        .btn-small { padding: 8px 14px; font-size: 13px; }
+        .result { margin-top: 15px; padding: 12px 15px; border-radius: 6px; display: none; font-size: 14px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        img.qr-preview { max-width: 180px; margin-top: 15px; display: block; border: 1px solid #ddd; border-radius: 6px; padding: 5px; background: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Issuer Login Bar -->
+        <div id="authSection" class="auth-bar">
+            <div id="loginFormContainer">
+                <strong>Issuer Login: </strong>
+                <input type="text" id="authUsername" placeholder="Username (admin)" style="width: 130px;">
+                <input type="password" id="authPassword" placeholder="Password (admin123)" style="width: 130px;">
+                <button type="button" class="btn-small" onclick="handleLogin()">Login</button>
+            </div>
+            <div id="userInfoContainer" style="display: none;">
+                <span>Logged in as: <strong id="loggedUser"></strong></span>
+                <button type="button" class="btn-small btn-danger" style="margin-left: 10px;" onclick="handleLogout()">Logout</button>
+            </div>
+        </div>
+
+        <h1>Institution Dashboard</h1>
+
+        <!-- Section 1: Issue New Certificate -->
+        <div class="card">
+            <h2>1. Issue New Certificate</h2>
+            <form id="issueForm">
+                <div class="form-group">
+                    <label for="institutionId">Institution ID</label>
+                    <input type="text" id="institutionId" required placeholder="e.g. UNIV01" value="UNIV01">
+                </div>
+                <div class="form-group">
+                    <label for="certificateId">Certificate ID</label>
+                    <input type="text" id="certificateId" required placeholder="Unique Certificate ID">
+                </div>
+                <div class="form-group">
+                    <label for="studentName">Student Name</label>
+                    <input type="text" id="studentName" required placeholder="Full Name">
+                </div>
+                <div class="form-group">
+                    <label for="courseName">Course Name</label>
+                    <input type="text" id="courseName" required placeholder="Degree / Program Title">
+                </div>
+                <div class="form-group">
+                    <label for="pdf">Certificate PDF Document</label>
+                    <input type="file" id="pdf" accept="application/pdf" required>
+                </div>
+                <button type="submit">Issue Certificate to Blockchain</button>
+            </form>
+
+            <div id="issueResultBox" class="result">
+                <h4 id="issueResultMessage" style="margin: 0 0 8px 0;"></h4>
+                <p id="issueResultHash" style="word-break: break-all; margin: 4px 0;"></p>
+                <a id="issueResultUrl" href="#" target="_blank" style="display: inline-block; margin-top: 6px; font-weight: bold;">Open Verification Link</a>
+                <img id="issueQrCode" class="qr-preview" src="" alt="QR Code" style="display:none;">
+            </div>
+        </div>
+
+        <!-- Section 2: Create New Version -->
+        <div class="card">
+            <h2>2. Create New Version (Update / Reissue)</h2>
+            <form id="versionForm">
+                <div class="form-group">
+                    <label for="versionInstId">Institution ID</label>
+                    <input type="text" id="versionInstId" required placeholder="e.g. UNIV01" value="UNIV01">
+                </div>
+                <div class="form-group">
+                    <label for="versionCertId">Certificate ID to Update</label>
+                    <input type="text" id="versionCertId" required placeholder="Existing Certificate ID">
+                </div>
+                <div class="form-group">
+                    <label for="versionPdf">New Updated Certificate PDF</label>
+                    <input type="file" id="versionPdf" accept="application/pdf" required>
+                </div>
+                <button type="submit" class="btn-warning">Create New Version on Blockchain</button>
+            </form>
+
+            <div id="versionResultBox" class="result">
+                <h4 id="versionResultMessage" style="margin: 0 0 8px 0;"></h4>
+                <p id="versionResultDetails" style="word-break: break-all; margin: 4px 0;"></p>
+            </div>
+        </div>
+
+        <!-- Section 3: Revoke Certificate -->
+        <div class="card">
+            <h2>3. Revoke Certificate</h2>
+            <form id="revokeForm">
+                <div class="form-group">
+                    <label for="revokeInstId">Institution ID</label>
+                    <input type="text" id="revokeInstId" required placeholder="e.g. UNIV01" value="UNIV01">
+                </div>
+                <div class="form-group">
+                    <label for="revokeCertId">Certificate ID to Revoke</label>
+                    <input type="text" id="revokeCertId" required placeholder="Certificate ID">
+                </div>
+                <button type="submit" class="btn-danger">Revoke Certificate on Blockchain</button>
+            </form>
+
+            <div id="revokeResultBox" class="result">
+                <h4 id="revokeResultMessage" style="margin: 0;"></h4>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function checkAuthState() {
+            const token = localStorage.getItem('jwt_token');
+            const username = localStorage.getItem('jwt_user');
+            if (token && username) {
+                document.getElementById('loginFormContainer').style.display = 'none';
+                document.getElementById('userInfoContainer').style.display = 'block';
+                document.getElementById('loggedUser').textContent = username;
+            } else {
+                document.getElementById('loginFormContainer').style.display = 'block';
+                document.getElementById('userInfoContainer').style.display = 'none';
+            }
+        }
+
+        async function handleLogin() {
+            const username = document.getElementById('authUsername').value || 'admin';
+            const password = document.getElementById('authPassword').value || 'admin123';
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('jwt_token', data.token);
+                    localStorage.setItem('jwt_user', data.user.username);
+                    checkAuthState();
+                    alert('Login successful!');
+                } else {
+                    alert('Login failed: ' + (data.error || 'Invalid credentials'));
+                }
+            } catch (err) {
+                alert('Login error: ' + err.message);
+            }
+        }
+
+        function handleLogout() {
+            localStorage.removeItem('jwt_token');
+            localStorage.removeItem('jwt_user');
+            checkAuthState();
+            alert('Logged out.');
+        }
+
+        function getAuthTokenOrAlert() {
+            const token = localStorage.getItem('jwt_token');
+            if (!token) {
+                alert('Authentication required. Please log in first using the Issuer Login bar.');
+                return null;
+            }
+            return token;
+        }
+
+        // 1. Issuance Form Submit
+        document.getElementById('issueForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = getAuthTokenOrAlert();
+            if (!token) return;
+
+            const formData = new FormData();
+            formData.append('institutionId', document.getElementById('institutionId').value);
+            formData.append('certificateId', document.getElementById('certificateId').value);
+            formData.append('studentName', document.getElementById('studentName').value);
+            formData.append('courseName', document.getElementById('courseName').value);
+            formData.append('pdf', document.getElementById('pdf').files[0]);
+
+            const submitBtn = e.target.querySelector('button');
+            submitBtn.textContent = 'Issuing... (Mining Block)';
+            submitBtn.disabled = true;
+
+            const resultBox = document.getElementById('issueResultBox');
+            resultBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/certificates/issue', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultBox.className = 'result success';
+                    resultBox.style.display = 'block';
+                    document.getElementById('issueResultMessage').textContent = 'Certificate Issued Successfully!';
+                    document.getElementById('issueResultHash').textContent = `SHA-256 Hash: ${data.hash}`;
+                    
+                    const urlElem = document.getElementById('issueResultUrl');
+                    urlElem.href = data.verifyUrl;
+                    urlElem.textContent = 'Open Verification Portal';
+                    
+                    const qr = document.getElementById('issueQrCode');
+                    qr.src = data.qrCode;
+                    qr.style.display = 'block';
+                    
+                    e.target.reset();
+                    document.getElementById('institutionId').value = 'UNIV01';
+                } else {
+                    throw new Error(data.error || data.details || 'Failed to issue');
+                }
+            } catch (error) {
+                resultBox.className = 'result error';
+                resultBox.style.display = 'block';
+                document.getElementById('issueResultMessage').textContent = 'Error: ' + error.message;
+                document.getElementById('issueResultHash').textContent = '';
+                document.getElementById('issueQrCode').style.display = 'none';
+            } finally {
+                submitBtn.textContent = 'Issue Certificate to Blockchain';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // 2. Version Form Submit
+        document.getElementById('versionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = getAuthTokenOrAlert();
+            if (!token) return;
+
+            const formData = new FormData();
+            formData.append('institutionId', document.getElementById('versionInstId').value);
+            formData.append('certificateId', document.getElementById('versionCertId').value);
+            formData.append('pdf', document.getElementById('versionPdf').files[0]);
+
+            const submitBtn = e.target.querySelector('button');
+            submitBtn.textContent = 'Creating Version... (Mining Block)';
+            submitBtn.disabled = true;
+
+            const resultBox = document.getElementById('versionResultBox');
+            resultBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/certificates/version', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultBox.className = 'result success';
+                    resultBox.style.display = 'block';
+                    document.getElementById('versionResultMessage').textContent = 'New Version Created Successfully!';
+                    document.getElementById('versionResultDetails').textContent = `Version: ${data.version || 2} | New Hash: ${data.newHash}`;
+                    e.target.reset();
+                    document.getElementById('versionInstId').value = 'UNIV01';
+                } else {
+                    throw new Error(data.error || data.details || 'Failed to create new version');
+                }
+            } catch (error) {
+                resultBox.className = 'result error';
+                resultBox.style.display = 'block';
+                document.getElementById('versionResultMessage').textContent = 'Error: ' + error.message;
+                document.getElementById('versionResultDetails').textContent = '';
+            } finally {
+                submitBtn.textContent = 'Create New Version on Blockchain';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // 3. Revoke Form Submit
+        document.getElementById('revokeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = getAuthTokenOrAlert();
+            if (!token) return;
+
+            const institutionId = document.getElementById('revokeInstId').value;
+            const certificateId = document.getElementById('revokeCertId').value;
+
+            if (!confirm(`Are you sure you want to permanently revoke certificate "${certificateId}"?`)) {
+                return;
+            }
+
+            const submitBtn = e.target.querySelector('button');
+            submitBtn.textContent = 'Revoking... (Mining Block)';
+            submitBtn.disabled = true;
+
+            const resultBox = document.getElementById('revokeResultBox');
+            resultBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/certificates/revoke', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ institutionId, certificateId })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultBox.className = 'result success';
+                    resultBox.style.display = 'block';
+                    document.getElementById('revokeResultMessage').textContent = `Certificate "${certificateId}" successfully REVOKED on blockchain.`;
+                    e.target.reset();
+                    document.getElementById('revokeInstId').value = 'UNIV01';
+                } else {
+                    throw new Error(data.error || data.details || 'Failed to revoke certificate');
+                }
+            } catch (error) {
+                resultBox.className = 'result error';
+                resultBox.style.display = 'block';
+                document.getElementById('revokeResultMessage').textContent = 'Error: ' + error.message;
+            } finally {
+                submitBtn.textContent = 'Revoke Certificate on Blockchain';
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Initialize state on load
+        checkAuthState();
+    </script>
+</body>
+</html>
