@@ -1,57 +1,94 @@
-import React, { useState } from 'react';
-import { Card, HashDisplay, Badge } from '../components/common/Components';
-import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Card, HashDisplay } from '../components/common/Components';
+import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Upload, FileText } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ethers } from 'ethers';
 
 export default function PublicVerification() {
-  const [form, setForm] = useState({ certId: '', hash: '' });
+  const [searchParams] = useSearchParams();
+  const [certId, setCertId] = useState(searchParams.get('id') || searchParams.get('certId') || '');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const idFromUrl = searchParams.get('id') || searchParams.get('certId');
+    if (idFromUrl) {
+      setCertId(idFromUrl);
+    }
+  }, [searchParams]);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const handleVerify = async (e) => {
     e.preventDefault();
+    if (!certId.trim()) {
+      alert('Please enter a Credential ID');
+      return;
+    }
+    if (!selectedFile) {
+      alert('Please select a certificate PDF file');
+      return;
+    }
+
     try {
       setLoading(true);
       setResult(null);
 
-      const statusNum = await blockchainService.verifyCertificate(form.certId, form.hash);
-      const statuses = ["NOT_FOUND", "VALID", "TAMPERED", "REVOKED", "EXPIRED"];
-      const statusText = statuses[statusNum];
+      const formData = new FormData();
+      formData.append('certificateId', certId.trim());
+      formData.append('pdf', selectedFile);
 
-      let version = "-";
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_URL}/api/certificates/verify`, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok && data.error && !data.status) {
+        throw new Error(data.error || 'Verification request failed');
+      }
+
+      const statusText = data.status || 'NOT_FOUND';
+      let version = data.version != null ? data.version.toString() : '-';
       let details = null;
-      if (statusNum === 1 || statusNum === 2 || statusNum === 3 || statusNum === 4) {
-          version = await blockchainService.getCertificateVersionCount(form.certId);
+
+      if (['VALID', 'TAMPERED', 'REVOKED', 'EXPIRED'].includes(statusText) && blockchainService.digitalCredential) {
+        try {
           const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
           const certReg = new ethers.Contract(certRegAddress, [
             "function certificates(string) view returns (string, string, address, uint256, uint8, uint256)"
           ], blockchainService.provider);
 
-          try {
-              const cert = await certReg.certificates(form.certId);
-              if (cert && cert[0] === form.certId) {
-                  details = {
-                      id: cert[0],
-                      hash: cert[1],
-                      issuer: cert[2],
-                      expiry: cert[3].toString(),
-                      status: cert[4],
-                      version: cert[5].toString()
-                  };
-              }
-          } catch(err) {
-              console.log("Could not fetch details", err);
+          const cert = await certReg.certificates(certId.trim());
+          if (cert && cert[0] === certId.trim()) {
+            details = {
+              id: cert[0],
+              hash: cert[1],
+              issuer: cert[2],
+              expiry: cert[3].toString(),
+              status: cert[4],
+              version: cert[5].toString()
+            };
           }
+        } catch (err) {
+          console.log("Could not fetch details", err);
+        }
       }
 
-      setResult({ status: statusText, version: version?.toString() || "-", details });
+      setResult({ status: statusText, version, details, certificateId: data.certificateId || certId.trim() });
 
     } catch (err) {
-      console.error(err);
-      setResult({ status: "ERROR", message: err.message });
+      console.error('Verification error:', err);
+      setResult({ status: 'ERROR', message: err.message });
     } finally {
       setLoading(false);
     }
@@ -181,14 +218,55 @@ export default function PublicVerification() {
             <form onSubmit={handleVerify}>
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 600 }}>Credential ID</label>
-                <input className="form-input" required placeholder="e.g. CERT-2026-001" value={form.certId} onChange={e => setForm({...form, certId: e.target.value})} style={{ padding: '1rem', fontSize: '1rem' }} />
+                <input className="form-input" required placeholder="e.g. CERT-2026-001" value={certId} onChange={e => setCertId(e.target.value)} style={{ padding: '1rem', fontSize: '1rem' }} />
               </div>
+
               <div className="form-group" style={{ marginBottom: '2rem' }}>
-                <label className="form-label" style={{ fontWeight: 600 }}>Document Hash (SHA-256)</label>
-                <input className="form-input mono" required placeholder="0x..." value={form.hash} onChange={e => setForm({...form, hash: e.target.value})} style={{ padding: '1rem', fontSize: '1rem' }} />
+                <label className="form-label" style={{ fontWeight: 600 }}>Certificate PDF</label>
+                <div style={{
+                  border: '2px dashed var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '1.75rem',
+                  textAlign: 'center',
+                  background: 'var(--bg-main)',
+                  cursor: 'pointer',
+                  position: 'relative'
+                }}>
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    required
+                    onChange={handleFileChange}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0,
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', pointerEvents: 'none' }}>
+                    {selectedFile ? (
+                      <>
+                        <FileText size={36} color="var(--primary)" />
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '1.05rem' }}>{selectedFile.name}</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>({(selectedFile.size / 1024).toFixed(1)} KB) — Click to change file</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={36} color="var(--text-muted)" />
+                        <span style={{ fontWeight: 500, color: 'var(--text-main)', fontSize: '1.05rem' }}>Choose Certificate PDF</span>
+                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Click to browse or drag and drop candidate PDF</span>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
+
               <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '1.25rem', fontSize: '1.1rem' }} disabled={loading}>
-                {loading ? 'Verifying on Blockchain...' : 'Verify Credential'}
+                {loading ? 'Verifying certificate...' : 'Verify Credential'}
               </button>
             </form>
           </Card>
