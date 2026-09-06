@@ -83,25 +83,50 @@ export function saveEventToDb({ eventType, certificateId, institutionId, issuer,
     const db = getDb();
     if (!db) return;
 
-    db.run(
-        `INSERT OR IGNORE INTO blockchain_events
-        (eventType, certificateId, institutionId, issuer, timestamp, blockNumber, transactionHash, logIndex, version)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            eventType,
-            certificateId || null,
-            institutionId || null,
-            issuer || null,
-            timestamp,
-            blockNumber,
-            transactionHash,
-            logIndex ?? 0,
-            version ?? 1
-        ],
-        (err) => {
-            if (err) {
-                console.error(`Error saving event ${eventType} to DB:`, err.message);
+    db.get(
+        `SELECT id, certificateId FROM blockchain_events WHERE transactionHash = ? AND logIndex = ?`,
+        [transactionHash, logIndex ?? 0],
+        (err, existingRow) => {
+            let finalCertId = certificateId || null;
+            if (existingRow && existingRow.certificateId && !existingRow.certificateId.startsWith('0x')) {
+                if (finalCertId && finalCertId.startsWith('0x')) {
+                    finalCertId = existingRow.certificateId;
+                }
             }
+
+            db.run(
+                `INSERT INTO blockchain_events
+                (eventType, certificateId, institutionId, issuer, timestamp, blockNumber, transactionHash, logIndex, version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(transactionHash, logIndex) DO UPDATE SET
+                eventType = EXCLUDED.eventType,
+                certificateId = CASE
+                    WHEN EXCLUDED.certificateId IS NOT NULL AND NOT EXCLUDED.certificateId LIKE '0x%' THEN EXCLUDED.certificateId
+                    WHEN blockchain_events.certificateId IS NOT NULL AND NOT blockchain_events.certificateId LIKE '0x%' THEN blockchain_events.certificateId
+                    ELSE COALESCE(EXCLUDED.certificateId, blockchain_events.certificateId)
+                END,
+                institutionId = COALESCE(EXCLUDED.institutionId, blockchain_events.institutionId),
+                issuer = COALESCE(EXCLUDED.issuer, blockchain_events.issuer),
+                timestamp = EXCLUDED.timestamp,
+                blockNumber = EXCLUDED.blockNumber,
+                version = COALESCE(EXCLUDED.version, blockchain_events.version)`,
+                [
+                    eventType,
+                    finalCertId,
+                    institutionId || null,
+                    issuer || null,
+                    timestamp,
+                    blockNumber,
+                    transactionHash,
+                    logIndex ?? 0,
+                    version ?? 1
+                ],
+                (err) => {
+                    if (err) {
+                        console.error(`Error saving event ${eventType} to DB:`, err.message);
+                    }
+                }
+            );
         }
     );
 }

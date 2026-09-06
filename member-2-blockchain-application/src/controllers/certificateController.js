@@ -1,6 +1,7 @@
 import { getDigitalCredentialContract, getDigitalCredentialContractForInstitution, getInstitutionSigner, verifyInstitutionSignerOnChain, getLiveNonce, parseContractError } from '../config/blockchain.js';
 import { getDb } from '../config/database.js';
 import { computeSHA256 } from '../services/hashService.js';
+import { saveEventToDb } from '../services/eventListener.js';
 import qrcode from 'qrcode';
 
 export const issueCertificate = async (req, res) => {
@@ -57,6 +58,20 @@ export const issueCertificate = async (req, res) => {
         // Save metadata to off-chain DB
         const db = getDb();
         const issueDate = req.body.issueDate || new Date().toISOString();
+
+        if (txHash && blockNumber) {
+            saveEventToDb({
+                eventType: 'CertificateIssued',
+                certificateId,
+                institutionId,
+                issuer: signerAddress,
+                timestamp: issueDate,
+                blockNumber,
+                transactionHash: txHash,
+                logIndex: 0,
+                version: 1
+            });
+        }
 
         db.run(
             'INSERT OR REPLACE INTO certificates (id, studentName, courseName, issueDate, institutionId, status) VALUES (?, ?, ?, ?, ?, ?)',
@@ -199,6 +214,19 @@ export const revokeCertificate = async (req, res) => {
         const nonce = await getLiveNonce(signer);
         const tx = await contract.revokeCertificate(institutionId, certificateId, { nonce });
         const receipt = await tx.wait();
+        const timestamp = new Date().toISOString();
+
+        saveEventToDb({
+            eventType: 'CertificateRevoked',
+            certificateId,
+            institutionId,
+            issuer: signerAddress,
+            timestamp,
+            blockNumber: receipt.blockNumber,
+            transactionHash: receipt.hash,
+            logIndex: 0,
+            version: 1
+        });
         
         res.json({
             message: 'Certificate revoked successfully on-chain',
@@ -240,6 +268,19 @@ export const createNewVersion = async (req, res) => {
             const updatedCert = await contract.getCertificate(certificateId);
             version = Number(updatedCert.version);
         } catch (e) {}
+
+        const timestamp = new Date().toISOString();
+        saveEventToDb({
+            eventType: 'CertificateVersionCreated',
+            certificateId,
+            institutionId,
+            issuer: signerAddress,
+            timestamp,
+            blockNumber: receipt.blockNumber,
+            transactionHash: receipt.hash,
+            logIndex: 0,
+            version: version || 1
+        });
         
         res.json({
             message: 'Certificate version created successfully on-chain',
