@@ -27,7 +27,7 @@ export default function Dashboard() {
            active: data.issued.length - data.revoked.length,
            institutions: data.institutions,
            issuers: uniqueIssuers,
-           recent: data.issued.sort((a,b) => b.timestamp - a.timestamp).slice(0, 5)
+           recent: data.issued.sort((a,b) => Number(b.timestamp) - Number(a.timestamp)).slice(0, 5)
         });
       } catch (err) {
         console.error(err);

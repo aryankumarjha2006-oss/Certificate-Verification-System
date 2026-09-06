@@ -34,9 +34,11 @@ export default function Issuers() {
 
       const revokedSet = new Set(revokedEvents.map(e => `${e.args[0]}-${e.args[1]}`));
 
+      const safeString = (val) => typeof val === 'string' ? val : (val?.hash || String(val || ''));
+
       const loaded = authEvents.map(e => {
-        const instId = e.args[0];
-        const wallet = e.args[1];
+        const instId = safeString(e.args[0]);
+        const wallet = safeString(e.args[1]);
         const key = `${instId}-${wallet}`;
         return {
           instId,
@@ -87,8 +89,8 @@ export default function Issuers() {
   };
 
   const filtered = issuers.filter(iss =>
-    iss.instId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    iss.wallet.toLowerCase().includes(searchTerm.toLowerCase())
+    (iss.instId || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+    (iss.wallet || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   return (

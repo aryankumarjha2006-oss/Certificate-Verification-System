@@ -25,19 +25,14 @@ export default function CredentialDetails() {
 
       const vList = [];
       for (let i = Number(count); i >= 1; i--) {
-        const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-        const certReg = new window.ethers.Contract(certRegAddress, [
-          "function getCertificateVersion(string memory, uint256) external view returns (tuple(string certificateId, string certificateHash, address issuer, uint256 expiryTimestamp, uint8 status, uint256 version))"
-        ], blockchainService.provider);
-
         try {
-          const vData = await certReg.getCertificateVersion(id, i);
+          const vData = await blockchainService.getCertificateVersion(id, i);
           vList.push({
-            version: Number(vData[5]),
-            hash: vData[1],
-            issuer: vData[2],
-            expiry: Number(vData[3]),
-            status: Number(vData[4])
+            version: Number(vData.version),
+            hash: vData.certificateHash,
+            issuer: vData.issuer,
+            expiry: Number(vData.expiryTimestamp),
+            status: Number(vData.status)
           });
         } catch(e) {
           console.error("Failed to load version", i, e);

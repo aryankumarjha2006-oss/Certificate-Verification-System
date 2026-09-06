@@ -14,14 +14,19 @@ export default function Verification() {
       setLoading(true);
       setResult(null);
 
-      const statusNum = await blockchainService.verifyCertificate(form.certId, form.hash);
+      const rawStatus = await blockchainService.verifyCertificate(form.certId, form.hash);
       const statuses = ["NOT_FOUND", "VALID", "TAMPERED", "REVOKED", "EXPIRED"];
-      const statusText = statuses[statusNum];
+      const statusText = typeof rawStatus === 'number' ? (statuses[rawStatus] || "NOT_FOUND") : (rawStatus || "NOT_FOUND");
 
       // Get additional info if valid
       let version = "-";
-      if (statusNum === 1) { // VALID
-          version = await blockchainService.getCertificateVersionCount(form.certId);
+      if (statusText === "VALID") {
+          try {
+              const vCount = await blockchainService.getCertificateVersionCount(form.certId);
+              version = vCount?.toString() || "-";
+          } catch (e) {
+              // fallback
+          }
       }
 
       setResult({ status: statusText, version: version?.toString() || "-" });

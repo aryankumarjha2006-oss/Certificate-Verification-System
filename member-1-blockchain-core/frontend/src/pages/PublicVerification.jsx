@@ -17,29 +17,25 @@ export default function PublicVerification() {
       setLoading(true);
       setResult(null);
 
-      const statusNum = await blockchainService.verifyCertificate(form.certId, form.hash);
+      const rawStatus = await blockchainService.verifyCertificate(form.certId, form.hash);
       const statuses = ["NOT_FOUND", "VALID", "TAMPERED", "REVOKED", "EXPIRED"];
-      const statusText = statuses[statusNum];
+      const statusText = typeof rawStatus === 'number' ? (statuses[rawStatus] || "NOT_FOUND") : (rawStatus || "NOT_FOUND");
 
       let version = "-";
       let details = null;
-      if (statusNum === 1 || statusNum === 2 || statusNum === 3 || statusNum === 4) {
-          version = await blockchainService.getCertificateVersionCount(form.certId);
-          const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-          const certReg = new ethers.Contract(certRegAddress, [
-            "function certificates(string) view returns (string, string, address, uint256, uint8, uint256)"
-          ], blockchainService.provider);
-
+      if (statusText !== "NOT_FOUND") {
           try {
-              const cert = await certReg.certificates(form.certId);
-              if (cert && cert[0] === form.certId) {
+              const vCount = await blockchainService.getCertificateVersionCount(form.certId);
+              version = vCount?.toString() || "-";
+              const cert = await blockchainService.getCertificate(form.certId);
+              if (cert && cert.certificateId === form.certId) {
                   details = {
-                      id: cert[0],
-                      hash: cert[1],
-                      issuer: cert[2],
-                      expiry: cert[3].toString(),
-                      status: cert[4],
-                      version: cert[5].toString()
+                      id: cert.certificateId,
+                      hash: cert.certificateHash,
+                      issuer: cert.issuer,
+                      expiry: cert.expiryTimestamp.toString(),
+                      status: cert.status,
+                      version: cert.version.toString()
                   };
               }
           } catch(err) {

@@ -3,6 +3,7 @@ import { Card, Badge, HashDisplay } from '../components/common/Components';
 import { LoadingState, EmptyState } from '../components/common/UIStates';
 import { Activity, Search, Filter } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
+import { ethers } from 'ethers';
 
 export default function BlockchainActivityPage() {
   const [events, setEvents] = useState([]);
@@ -26,7 +27,7 @@ export default function BlockchainActivityPage() {
 
       // Get Credential events
       const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-      const certReg = new window.ethers.Contract(certRegAddress, [
+      const certReg = new ethers.Contract(certRegAddress, [
         "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
         "event CertificateRevoked(string indexed certificateId)"
       ], blockchainService.provider);
@@ -39,11 +40,13 @@ export default function BlockchainActivityPage() {
 
       const [e1, e2, e3, e4] = await Promise.all([p1, p2, p3, p4]);
 
+      const safeEntity = (val) => typeof val === 'string' ? val : (val?.hash || String(val || ''));
+
       const combined = [
-        ...e1.map(e => ({ name: 'InstitutionRegistered', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] })),
-        ...e2.map(e => ({ name: 'IssuerAuthorized', block: e.blockNumber, tx: e.transactionHash, entity: e.args[1] })),
-        ...e3.map(e => ({ name: 'CertificateIssued', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] })),
-        ...e4.map(e => ({ name: 'CertificateRevoked', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] }))
+        ...e1.map(e => ({ name: 'InstitutionRegistered', block: e.blockNumber, tx: e.transactionHash, entity: safeEntity(e.args[0]) })),
+        ...e2.map(e => ({ name: 'IssuerAuthorized', block: e.blockNumber, tx: e.transactionHash, entity: safeEntity(e.args[1]) })),
+        ...e3.map(e => ({ name: 'CertificateIssued', block: e.blockNumber, tx: e.transactionHash, entity: safeEntity(e.args[0]) })),
+        ...e4.map(e => ({ name: 'CertificateRevoked', block: e.blockNumber, tx: e.transactionHash, entity: safeEntity(e.args[0]) }))
       ];
 
       combined.sort((a,b) => b.block - a.block);
@@ -62,8 +65,8 @@ export default function BlockchainActivityPage() {
   }
 
   const filtered = events.filter(e =>
-     e.tx.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     e.entity.toLowerCase().includes(searchTerm.toLowerCase())
+     (e.tx || "").toLowerCase().includes((searchTerm || "").toLowerCase()) ||
+     (e.entity || "").toLowerCase().includes((searchTerm || "").toLowerCase())
   );
 
   return (

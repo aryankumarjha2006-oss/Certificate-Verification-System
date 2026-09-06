@@ -3,6 +3,7 @@ import { Card, StatCard, Badge } from '../components/common/Components';
 import { LoadingState } from '../components/common/UIStates';
 import { BarChart3, Activity, Users, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
+import { ethers } from 'ethers';
 
 export default function Analytics() {
   const [stats, setStats] = useState({
@@ -32,7 +33,7 @@ export default function Analytics() {
       const p2 = instReg.queryFilter(instFilter2, 0, "latest");
 
       const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-      const certReg = new window.ethers.Contract(certRegAddress, [
+      const certReg = new ethers.Contract(certRegAddress, [
         "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
         "event CertificateRevoked(string indexed certificateId)"
       ], blockchainService.provider);
@@ -45,11 +46,13 @@ export default function Analytics() {
 
       const [eInsts, eIssuers, eIssued, eRevoked] = await Promise.all([p1, p2, p3, p4]);
 
+      const safeId = (val) => typeof val === 'string' ? val : (val?.hash || String(val || ''));
+
       // Compute unique counts
-      const uniqueInsts = new Set(eInsts.map(e => e.args[0])).size;
-      const uniqueIssuers = new Set(eIssuers.map(e => `${e.args[0]}-${e.args[1]}`)).size;
-      const uniqueIssued = new Set(eIssued.map(e => e.args[0])).size;
-      const uniqueRevoked = new Set(eRevoked.map(e => e.args[0])).size;
+      const uniqueInsts = new Set(eInsts.map(e => safeId(e.args[0]))).size;
+      const uniqueIssuers = new Set(eIssuers.map(e => `${safeId(e.args[0])}-${e.args[1]}`)).size;
+      const uniqueIssued = new Set(eIssued.map(e => safeId(e.args[0]))).size;
+      const uniqueRevoked = new Set(eRevoked.map(e => safeId(e.args[0]))).size;
 
       // Sort for recent activity
       const recentIssued = eIssued.sort((a,b) => b.blockNumber - a.blockNumber).slice(0, 5);
@@ -61,8 +64,8 @@ export default function Analytics() {
         totalIssued: uniqueIssued,
         totalRevoked: uniqueRevoked,
         activeCertificates: uniqueIssued - uniqueRevoked,
-        recentIssuance: recentIssued.map(e => ({ id: e.args[0], block: e.blockNumber })),
-        recentRevocation: recentRevoked.map(e => ({ id: e.args[0], block: e.blockNumber }))
+        recentIssuance: recentIssued.map(e => ({ id: safeId(e.args[0]), block: e.blockNumber })),
+        recentRevocation: recentRevoked.map(e => ({ id: safeId(e.args[0]), block: e.blockNumber }))
       });
 
     } catch (err) {
