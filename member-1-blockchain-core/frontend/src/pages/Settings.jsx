@@ -1,17 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, Badge } from '../components/common/Components';
-import { Settings as SettingsIcon, Moon, Sun, Monitor, Bell, Shield, Wallet } from 'lucide-react';
+import { Monitor, Bell, Shield, Wallet } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 
 export default function Settings({ network }) {
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
-
   return (
     <div>
       <div className="page-header">
@@ -20,28 +12,8 @@ export default function Settings({ network }) {
       </div>
 
       <div className="grid-1-1">
-        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Monitor size={18}/> Appearance</div>}>
+        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Monitor size={18}/> Preferences</div>}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div>
-              <label style={{ display: 'block', fontWeight: 500, marginBottom: '0.75rem' }}>Theme Preference</label>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <button
-                  className={`btn ${theme === 'light' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => handleThemeChange('light')}
-                  style={{ flex: 1 }}
-                >
-                  <Sun size={18} /> Light Mode
-                </button>
-                <button
-                  className={`btn ${theme === 'dark' ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => handleThemeChange('dark')}
-                  style={{ flex: 1 }}
-                >
-                  <Moon size={18} /> Dark Mode
-                </button>
-              </div>
-            </div>
-
             <div style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

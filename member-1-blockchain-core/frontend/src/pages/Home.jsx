@@ -1,11 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Search, FileCheck, CheckCircle, ArrowRight, ShieldCheck, Database, Layers } from 'lucide-react';
+import { Shield, Search, FileCheck, CheckCircle, ArrowRight, ShieldCheck, Database, Layers, Sun, Moon } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { Badge } from '../components/common/Components';
 import { ethers } from 'ethers';
 
-export default function Home() {
+export default function Home({ theme, toggleTheme }) {
   const navigate = useNavigate();
   const [networkStatus, setNetworkStatus] = React.useState('Checking...');
   const [walletStatus, setWalletStatus] = React.useState('Not Connected');
@@ -55,6 +55,17 @@ export default function Home() {
           <h1 style={{ margin: 0, fontSize: '1.75rem', letterSpacing: '-0.025em' }}>CredChain</h1>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => navigate('/verify')}>
             <Search size={18} /> Verify Credential
           </button>

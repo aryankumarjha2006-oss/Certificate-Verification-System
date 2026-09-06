@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Card, HashDisplay, Badge } from '../components/common/Components';
-import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft } from 'lucide-react';
+import { Card, HashDisplay } from '../components/common/Components';
+import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { useNavigate } from 'react-router-dom';
 
-export default function PublicVerification() {
+export default function PublicVerification({ theme, toggleTheme }) {
   const [form, setForm] = useState({ certId: '', hash: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -158,9 +158,22 @@ export default function PublicVerification() {
           <Shield size={32} color="var(--primary)" />
           <h1 style={{ margin: 0, fontSize: '1.75rem', letterSpacing: '-0.025em' }}>CredChain</h1>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ border: 'none', background: 'transparent' }}>
-          <ArrowLeft size={18} /> Back to Home
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          {toggleTheme && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+              title={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ border: 'none', background: 'transparent' }}>
+            <ArrowLeft size={18} /> Back to Home
+          </button>
+        </div>
       </header>
 
       <main className="public-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem 2rem' }}>

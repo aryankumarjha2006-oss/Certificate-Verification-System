@@ -1,6 +1,6 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle, Sun, Moon } from 'lucide-react';
 import { Badge } from '../common/Components';
 
 export function Sidebar() {
@@ -38,9 +38,8 @@ export function Sidebar() {
   );
 }
 
-export function Header({ wallet, network, connect }) {
+export function Header({ wallet, network, connect, theme, toggleTheme }) {
   const [copied, setCopied] = React.useState(false);
-  const navigate = useNavigate();
 
   const handleCopy = () => {
     if (wallet) {
@@ -59,6 +58,17 @@ export function Header({ wallet, network, connect }) {
         </div>
       </div>
       <div className="header-right">
+        {toggleTheme && (
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="theme-toggle-btn"
+            aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        )}
         {wallet ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
              {network === 'Hardhat Local' ? (
@@ -102,12 +112,12 @@ export function Header({ wallet, network, connect }) {
   );
 }
 
-export function AppShell({ children, wallet, network, connect }) {
+export function AppShell({ children, wallet, network, connect, theme, toggleTheme }) {
   return (
     <div className="app-shell">
       <Sidebar />
       <div className="main-wrapper">
-        <Header wallet={wallet} network={network} connect={connect} />
+        <Header wallet={wallet} network={network} connect={connect} theme={theme} toggleTheme={toggleTheme} />
         <main className="main-content">
           {children}
         </main>

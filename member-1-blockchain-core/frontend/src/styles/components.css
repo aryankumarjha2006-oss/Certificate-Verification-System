@@ -172,6 +172,35 @@ tr:hover td {
 }
 .btn-danger:hover:not(:disabled) { background-color: #b91c1c; }
 
+/* Theme Toggle */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--bg-main);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.theme-toggle-btn:hover {
+  background-color: var(--border-subtle);
+  border-color: var(--secondary);
+  color: var(--secondary);
+  transform: translateY(-1px);
+}
+
+.theme-toggle-btn:focus-visible {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
 /* Forms */
 .form-group {
   display: flex;

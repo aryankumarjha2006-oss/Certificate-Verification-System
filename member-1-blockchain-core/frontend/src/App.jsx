@@ -31,6 +31,10 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  const toggleTheme = () => {
+    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   const connect = async () => {
     try {
       const data = await blockchainService.connectWallet();
@@ -89,10 +93,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/verify" element={<PublicVerification />} />
+        <Route path="/" element={<Home theme={theme} toggleTheme={toggleTheme} />} />
+        <Route path="/verify" element={<PublicVerification theme={theme} toggleTheme={toggleTheme} />} />
         <Route path="/*" element={
-          <AppShell wallet={wallet} network={network} connect={connect}>
+          <AppShell wallet={wallet} network={network} connect={connect} theme={theme} toggleTheme={toggleTheme}>
             <Routes>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/analytics" element={<Analytics />} />
