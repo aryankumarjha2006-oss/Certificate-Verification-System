@@ -45,24 +45,30 @@ export default function Analytics() {
 
       const [eInsts, eIssuers, eIssued, eRevoked] = await Promise.all([p1, p2, p3, p4]);
 
+      const parseArg = (val) => {
+        if (typeof val === 'string') return val;
+        if (val && typeof val === 'object' && val.hash) return val.hash;
+        return String(val ?? '');
+      };
+
       // Compute unique counts
-      const uniqueInsts = new Set(eInsts.map(e => e.args[0])).size;
-      const uniqueIssuers = new Set(eIssuers.map(e => `${e.args[0]}-${e.args[1]}`)).size;
-      const uniqueIssued = new Set(eIssued.map(e => e.args[0])).size;
-      const uniqueRevoked = new Set(eRevoked.map(e => e.args[0])).size;
+      const uniqueInsts = new Set(eInsts.map(e => parseArg(e.args[0]))).size;
+      const uniqueIssuers = new Set(eIssuers.map(e => `${parseArg(e.args[0])}-${parseArg(e.args[1])}`)).size;
+      const uniqueIssued = new Set(eIssued.map(e => parseArg(e.args[0]))).size;
+      const uniqueRevoked = new Set(eRevoked.map(e => parseArg(e.args[0]))).size;
 
       // Sort for recent activity
-      const recentIssued = eIssued.sort((a,b) => b.blockNumber - a.blockNumber).slice(0, 5);
-      const recentRevoked = eRevoked.sort((a,b) => b.blockNumber - a.blockNumber).slice(0, 5);
+      const recentIssued = eIssued.sort((a,b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 5);
+      const recentRevoked = eRevoked.sort((a,b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 5);
 
       setStats({
         totalInstitutions: uniqueInsts,
         authorizedIssuers: uniqueIssuers,
         totalIssued: uniqueIssued,
         totalRevoked: uniqueRevoked,
-        activeCertificates: uniqueIssued - uniqueRevoked,
-        recentIssuance: recentIssued.map(e => ({ id: e.args[0], block: e.blockNumber })),
-        recentRevocation: recentRevoked.map(e => ({ id: e.args[0], block: e.blockNumber }))
+        activeCertificates: Math.max(0, uniqueIssued - uniqueRevoked),
+        recentIssuance: recentIssued.map(e => ({ id: parseArg(e.args[0]), block: Number(e.blockNumber) })),
+        recentRevocation: recentRevoked.map(e => ({ id: parseArg(e.args[0]), block: Number(e.blockNumber) }))
       });
 
     } catch (err) {

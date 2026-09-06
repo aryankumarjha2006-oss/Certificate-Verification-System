@@ -37,13 +37,17 @@ export default function BlockchainActivityPage() {
       const p3 = certReg.queryFilter(certFilter1, 0, "latest");
       const p4 = certReg.queryFilter(certFilter2, 0, "latest");
 
-      const [e1, e2, e3, e4] = await Promise.all([p1, p2, p3, p4]);
+      const parseArg = (val) => {
+        if (typeof val === 'string') return val;
+        if (val && typeof val === 'object' && val.hash) return val.hash;
+        return String(val ?? '');
+      };
 
       const combined = [
-        ...e1.map(e => ({ name: 'InstitutionRegistered', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] })),
-        ...e2.map(e => ({ name: 'IssuerAuthorized', block: e.blockNumber, tx: e.transactionHash, entity: e.args[1] })),
-        ...e3.map(e => ({ name: 'CertificateIssued', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] })),
-        ...e4.map(e => ({ name: 'CertificateRevoked', block: e.blockNumber, tx: e.transactionHash, entity: e.args[0] }))
+        ...e1.map(e => ({ name: 'InstitutionRegistered', block: Number(e.blockNumber), tx: String(e.transactionHash || ''), entity: parseArg(e.args[0]) })),
+        ...e2.map(e => ({ name: 'IssuerAuthorized', block: Number(e.blockNumber), tx: String(e.transactionHash || ''), entity: parseArg(e.args[1]) })),
+        ...e3.map(e => ({ name: 'CertificateIssued', block: Number(e.blockNumber), tx: String(e.transactionHash || ''), entity: parseArg(e.args[0]) })),
+        ...e4.map(e => ({ name: 'CertificateRevoked', block: Number(e.blockNumber), tx: String(e.transactionHash || ''), entity: parseArg(e.args[0]) }))
       ];
 
       combined.sort((a,b) => b.block - a.block);
@@ -61,10 +65,12 @@ export default function BlockchainActivityPage() {
     return <Badge type="neutral">{name}</Badge>;
   }
 
-  const filtered = events.filter(e =>
-     e.tx.toLowerCase().includes(searchTerm.toLowerCase()) ||
-     e.entity.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = events.filter(e => {
+     const txStr = String(e?.tx || '');
+     const entityStr = String(e?.entity || '');
+     return txStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            entityStr.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div>

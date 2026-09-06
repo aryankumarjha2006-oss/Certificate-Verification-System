@@ -110,10 +110,12 @@ export default function Certificates() {
     }
   };
 
-  const filtered = credentials.filter(c =>
-    c.certId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.issuer.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filtered = credentials.filter(c => {
+    const certIdStr = typeof c?.certId === 'string' ? c.certId : (c?.certId?.hash || String(c?.certId || ''));
+    const issuerStr = typeof c?.issuer === 'string' ? c.issuer : String(c?.issuer || '');
+    return certIdStr.toLowerCase().includes(searchTerm.toLowerCase()) ||
+           issuerStr.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   return (
     <div>
@@ -178,8 +180,10 @@ export default function Certificates() {
               <tbody>
                 {filtered.map((cert, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{cert.certId}</td>
-                    <td className="mono" style={{ fontSize: '0.85rem' }}>{cert.issuer.substring(0, 10)}...</td>
+                    <td style={{ fontWeight: 500 }}>{String(cert.certId || '')}</td>
+                    <td className="mono" style={{ fontSize: '0.85rem' }}>
+                      {typeof cert.issuer === 'string' && cert.issuer.length > 10 ? `${cert.issuer.substring(0, 10)}...` : String(cert.issuer || '')}
+                    </td>
                     <td>{cert.issueDate}</td>
                     <td>
                       <Badge type={cert.status === 'ACTIVE' ? 'success' : 'danger'}>{cert.status}</Badge>

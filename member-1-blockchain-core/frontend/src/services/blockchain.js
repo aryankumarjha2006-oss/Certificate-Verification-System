@@ -139,14 +139,20 @@ class BlockchainService {
     const issuedEvents = await certReg.queryFilter(certIssuedFilter, 0, "latest");
     const revokedEvents = await certReg.queryFilter(certRevokedFilter, 0, "latest");
 
+    const parseArg = (val) => {
+      if (typeof val === 'string') return val;
+      if (val && typeof val === 'object' && val.hash) return val.hash;
+      return String(val ?? '');
+    };
+
     return {
        issued: issuedEvents.map(e => ({
-           certId: e.args[0],
-           issuer: e.args[2],
-           timestamp: e.args[3]
+           certId: parseArg(e.args[0]),
+           issuer: parseArg(e.args[2]),
+           timestamp: e.args[3] ? String(e.args[3]) : '0'
        })),
        revoked: revokedEvents.map(e => ({
-           certId: e.args[0]
+           certId: parseArg(e.args[0])
        })),
        institutions: instEvents.length
     };

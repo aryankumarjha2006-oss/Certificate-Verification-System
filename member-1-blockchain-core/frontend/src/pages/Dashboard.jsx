@@ -19,15 +19,21 @@ export default function Dashboard() {
         const instFilter2 = instReg.filters.IssuerAuthorized();
         const eIssuers = await instReg.queryFilter(instFilter2, 0, "latest");
 
-        const uniqueIssuers = new Set(eIssuers.map(e => `${e.args[0]}-${e.args[1]}`)).size;
+        const parseArg = (val) => {
+          if (typeof val === 'string') return val;
+          if (val && typeof val === 'object' && val.hash) return val.hash;
+          return String(val ?? '');
+        };
+
+        const uniqueIssuers = new Set(eIssuers.map(e => `${parseArg(e.args[0])}-${parseArg(e.args[1])}`)).size;
 
         setStats({
            totalIssued: data.issued.length,
            revoked: data.revoked.length,
-           active: data.issued.length - data.revoked.length,
+           active: Math.max(0, data.issued.length - data.revoked.length),
            institutions: data.institutions,
            issuers: uniqueIssuers,
-           recent: data.issued.sort((a,b) => b.timestamp - a.timestamp).slice(0, 5)
+           recent: data.issued.slice().sort((a,b) => Number(b.timestamp || 0) - Number(a.timestamp || 0)).slice(0, 5)
         });
       } catch (err) {
         console.error(err);
@@ -89,8 +95,10 @@ export default function Dashboard() {
                       <tbody>
                          {stats?.recent.map((r, i) => (
                             <tr key={i} style={{cursor: 'pointer'}} onClick={() => navigate(`/credentials/${r.certId}`)}>
-                               <td style={{fontWeight: 500}}>{r.certId}</td>
-                               <td className="mono" style={{fontSize: '0.85rem'}}>{r.issuer.substring(0,8)}...</td>
+                               <td style={{fontWeight: 500}}>{String(r.certId || '')}</td>
+                               <td className="mono" style={{fontSize: '0.85rem'}}>
+                                 {typeof r.issuer === 'string' && r.issuer.length > 8 ? `${r.issuer.substring(0,8)}...` : String(r.issuer || '')}
+                               </td>
                                <td><Badge type="success">Issued</Badge></td>
                             </tr>
                          ))}
