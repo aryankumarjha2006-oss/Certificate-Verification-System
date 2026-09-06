@@ -19,9 +19,10 @@ export default function Certificates() {
   // Modal & Creator States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [step, setStep] = useState(1); // 1: Form, 2: PDF Preview & Auth Check, 3: Success
+  const [registeredInstitutions, setRegisteredInstitutions] = useState([]);
   const [formData, setFormData] = useState({
     instId: 'DEMO_INST_01',
-    instName: 'Global Tech University',
+    instName: 'Demo Tech University',
     studentName: 'Alice Johnson',
     courseName: 'B.S. Computer Science & Cybersecurity',
     certId: `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -44,10 +45,15 @@ export default function Certificates() {
     try {
       if (!blockchainService.provider) return;
       setLoading(true);
-      const data = await blockchainService.getAllEvents();
-      const revokedSet = new Set(data.revoked.map(r => r.certId));
+      const [data, registeredList] = await Promise.all([
+        blockchainService.getAllEvents(),
+        blockchainService.getAllRegisteredInstitutions()
+      ]);
+      setRegisteredInstitutions(registeredList);
 
-      const enriched = data.issued.map(cert => ({
+      const revokedSet = new Set((data.revoked || []).map(r => r.certId));
+
+      const enriched = (data.issued || []).map(cert => ({
         ...cert,
         status: revokedSet.has(cert.certId) || cert.status === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
         issueDate: cert.timestamp && Number(cert.timestamp) > 0
@@ -64,9 +70,10 @@ export default function Certificates() {
   };
 
   const handleOpenModal = () => {
+    const defaultInst = registeredInstitutions.find(i => i.id === 'DEMO_INST_01') || registeredInstitutions[0] || { id: 'DEMO_INST_01', name: 'Demo Tech University' };
     setFormData({
-      instId: 'DEMO_INST_01',
-      instName: 'Global Tech University',
+      instId: defaultInst.id,
+      instName: defaultInst.name,
       studentName: 'Alice Johnson',
       courseName: 'B.S. Computer Science & Cybersecurity',
       certId: `CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -390,14 +397,58 @@ export default function Certificates() {
               <strong>Institution-Controlled Issuance:</strong> Fills certificate details, generates the PDF with an embedded verification QR code, computes its SHA-256 hash, and prompts your MetaMask wallet for on-chain signing.
             </div>
 
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Select Registered Institution</label>
+              <select
+                className="form-input"
+                value={formData.instId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === 'CUSTOM') {
+                    setFormData({ ...formData, instId: 'CUSTOM', instName: '' });
+                  } else {
+                    const found = registeredInstitutions.find(i => i.id === val);
+                    if (found) {
+                      setFormData({ ...formData, instId: found.id, instName: found.name });
+                    } else {
+                      setFormData({ ...formData, instId: val });
+                    }
+                  }
+                }}
+              >
+                {registeredInstitutions.map(inst => (
+                  <option key={inst.id} value={inst.id}>
+                    {inst.name} ({inst.id})
+                  </option>
+                ))}
+                <option value="CUSTOM">-- Custom Institution ID --</option>
+              </select>
+            </div>
+
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600 }}>Institution ID</label>
-                <input className="form-input" required value={formData.instId} onChange={e => setFormData({...formData, instId: e.target.value})} placeholder="e.g. DEMO_INST_01" />
+                <label className="form-label" style={{ fontWeight: 600 }}>Canonical Institution ID</label>
+                <input
+                  className="form-input mono"
+                  required
+                  readOnly={formData.instId !== 'CUSTOM'}
+                  value={formData.instId}
+                  onChange={e => setFormData({...formData, instId: e.target.value})}
+                  placeholder="e.g. DEMO_INST_01"
+                  style={{ background: formData.instId !== 'CUSTOM' ? 'var(--bg-main)' : 'var(--bg-card)', cursor: formData.instId !== 'CUSTOM' ? 'not-allowed' : 'text' }}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 600 }}>Institution Name</label>
-                <input className="form-input" required value={formData.instName} onChange={e => setFormData({...formData, instName: e.target.value})} placeholder="e.g. Global Tech University" />
+                <input
+                  className="form-input"
+                  required
+                  readOnly={formData.instId !== 'CUSTOM'}
+                  value={formData.instName}
+                  onChange={e => setFormData({...formData, instName: e.target.value})}
+                  placeholder="e.g. Demo Tech University"
+                  style={{ background: formData.instId !== 'CUSTOM' ? 'var(--bg-main)' : 'var(--bg-card)', cursor: formData.instId !== 'CUSTOM' ? 'not-allowed' : 'text' }}
+                />
               </div>
             </div>
 

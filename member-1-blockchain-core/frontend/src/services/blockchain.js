@@ -119,6 +119,77 @@ class BlockchainService {
     return await contract.getInstitution(instId);
   }
 
+  async getAllRegisteredInstitutions() {
+    const candidateIds = new Set(['DEMO_INST_01', 'INST-001', 'INST-002', 'UNIV01']);
+
+    try {
+      const res = await fetch('http://localhost:3000/api/certificates');
+      if (res.ok) {
+        const certs = await res.json();
+        certs.forEach(c => { if (c.institutionId) candidateIds.add(c.institutionId); });
+      }
+    } catch(e) {}
+
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+
+    const list = [];
+    for (const id of candidateIds) {
+      try {
+        const inst = await contract.getInstitution(id);
+        if (inst && (inst.exists || inst[4])) {
+          list.push({
+            id: String(inst.id || inst[0] || id),
+            name: String(inst.name || inst[1] || 'Unknown Institution'),
+            wallet: String(inst.wallet || inst[2] || '0x000'),
+            isActive: Boolean(inst.isActive ?? inst[3] ?? true)
+          });
+        }
+      } catch(e) {}
+    }
+    return list;
+  }
+
+  async getAllAuthorizedIssuers() {
+    const institutions = await this.getAllRegisteredInstitutions();
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+
+    const candidateWallets = new Set([
+      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+      '0x3C44CdD459693451D78155437276156522617737',
+      '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+    ]);
+
+    try {
+      const authEvents = await contract.queryFilter(contract.filters.IssuerAuthorized(), 0, "latest");
+      authEvents.forEach(e => {
+        if (e.args[1]) candidateWallets.add(e.args[1]);
+      });
+    } catch(e) {}
+
+    const issuersList = [];
+    for (const inst of institutions) {
+      if (inst.wallet) candidateWallets.add(inst.wallet);
+
+      for (const wallet of candidateWallets) {
+        try {
+          const isAuth = await contract.isAuthorizedIssuer(inst.id, wallet);
+          const isPrimary = inst.wallet && inst.wallet.toLowerCase() === wallet.toLowerCase();
+          if (isAuth || isPrimary) {
+            issuersList.push({
+              instId: inst.id,
+              instName: inst.name,
+              wallet: wallet,
+              status: 'AUTHORIZED',
+              isPrimary
+            });
+          }
+        } catch(e) {}
+      }
+    }
+    return issuersList;
+  }
+
   async isAuthorizedIssuer(instId, issuerWallet) {
     const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
 

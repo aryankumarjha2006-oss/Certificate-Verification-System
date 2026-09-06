@@ -6,6 +6,7 @@ import { blockchainService } from '../services/blockchain';
 
 export default function Issuers() {
   const [issuers, setIssuers] = useState([]);
+  const [registeredInstitutions, setRegisteredInstitutions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -24,52 +25,19 @@ export default function Issuers() {
     try {
       if (!blockchainService.provider) return;
       setLoading(true);
-      const instReg = blockchainService.institutionRegistry;
 
-      // Query registered institutions to resolve human-readable names
-      const instFilter = instReg.filters.InstitutionRegistered();
-      const instEvents = await instReg.queryFilter(instFilter, 0, "latest");
-      const instNameMap = new Map();
-      instEvents.forEach(e => {
-        const h = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0]?.hash || String(e.args[0] || ''));
-        instNameMap.set(h, e.args[1] || 'Unknown Institution');
-      });
+      const [resolvedIssuers, registeredList] = await Promise.all([
+        blockchainService.getAllAuthorizedIssuers(),
+        blockchainService.getAllRegisteredInstitutions()
+      ]);
 
-      const authFilter = instReg.filters.IssuerAuthorized();
-      const authEvents = await instReg.queryFilter(authFilter, 0, "latest");
-
-      const revokedFilter = instReg.filters.IssuerRevoked();
-      const revokedEvents = await instReg.queryFilter(revokedFilter, 0, "latest");
-
-      const revokedSet = new Set(revokedEvents.map(e => {
-        const rId = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0]?.hash || String(e.args[0] || ''));
-        const rWallet = typeof e.args[1] === 'string' ? e.args[1] : String(e.args[1] || '');
-        return `${rId}-${rWallet}`;
-      }));
-
-      const loaded = authEvents.map(e => {
-        const idRaw = e.args[0];
-        const safeHash = typeof idRaw === 'string' ? idRaw : (idRaw?.hash || String(idRaw || ''));
-        const displayName = instNameMap.get(safeHash) || (safeHash.length > 20 ? `${safeHash.substring(0, 10)}...${safeHash.substring(safeHash.length - 6)}` : safeHash);
-        const wallet = typeof e.args[1] === 'string' ? e.args[1] : String(e.args[1] || '');
-        const key = `${safeHash}-${wallet}`;
-        return {
-          instId: displayName,
-          rawId: safeHash,
-          wallet,
-          status: revokedSet.has(key) ? 'REVOKED' : 'AUTHORIZED'
-        };
-      });
-
-      // Deduplicate keeping latest status
-      const uniqueMap = new Map();
-      loaded.forEach(item => {
-        uniqueMap.set(`${item.rawId}-${item.wallet}`, item);
-      });
-
-      setIssuers(Array.from(uniqueMap.values()));
+      setIssuers(resolvedIssuers);
+      setRegisteredInstitutions(registeredList);
+      if (registeredList.length > 0 && !formData.instId) {
+        setFormData(prev => ({ ...prev, instId: registeredList[0].id }));
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load authorized issuers:', err);
     } finally {
       setLoading(false);
     }
@@ -104,9 +72,10 @@ export default function Issuers() {
 
   const filtered = (issuers || []).filter(iss => {
     const term = (searchTerm || '').toLowerCase();
-    const matchInst = String(iss.instId || '').toLowerCase().includes(term);
+    const matchId = String(iss.instId || '').toLowerCase().includes(term);
+    const matchName = String(iss.instName || '').toLowerCase().includes(term);
     const matchWallet = String(iss.wallet || '').toLowerCase().includes(term);
-    return matchInst || matchWallet;
+    return matchId || matchName || matchWallet;
   });
 
   return (
@@ -130,7 +99,7 @@ export default function Issuers() {
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
-              placeholder="Search by Institution ID or Wallet..."
+              placeholder="Search by Institution ID, Name, or Wallet..."
               className="form-input"
               style={{ width: '100%', paddingLeft: '2.5rem' }}
               value={searchTerm}
@@ -154,6 +123,7 @@ export default function Issuers() {
               <thead>
                 <tr>
                   <th>Institution ID</th>
+                  <th>Institution Name</th>
                   <th>Issuer Wallet Address</th>
                   <th>Status</th>
                 </tr>
@@ -161,7 +131,8 @@ export default function Issuers() {
               <tbody>
                 {filtered.map((iss, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 500 }}>{iss.instId}</td>
+                    <td className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>{iss.instId}</td>
+                    <td style={{ fontWeight: 500 }}>{iss.instName}</td>
                     <td className="mono" style={{ fontSize: '0.9rem' }}>{iss.wallet}</td>
                     <td>
                       <Badge type={iss.status === 'AUTHORIZED' ? 'success' : 'danger'}>{iss.status}</Badge>
@@ -177,9 +148,31 @@ export default function Issuers() {
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Authorize Issuer">
         <form onSubmit={handleAuthorize}>
           <div className="form-group">
-            <label className="form-label">Institution ID</label>
-            <input className="form-input" required value={formData.instId} onChange={e => setFormData({...formData, instId: e.target.value})} placeholder="e.g. INST-001" />
+            <label className="form-label">Select Registered Institution</label>
+            <select
+              className="form-input"
+              value={formData.instId}
+              onChange={e => setFormData({ ...formData, instId: e.target.value })}
+            >
+              {registeredInstitutions.map(inst => (
+                <option key={inst.id} value={inst.id}>
+                  {inst.name} ({inst.id})
+                </option>
+              ))}
+              <option value="CUSTOM">-- Enter Manual Institution ID --</option>
+            </select>
           </div>
+          {formData.instId === 'CUSTOM' ? (
+            <div className="form-group">
+              <label className="form-label">Custom Institution ID</label>
+              <input className="form-input" required placeholder="e.g. INST-001" onChange={e => setFormData({ ...formData, instId: e.target.value })} />
+            </div>
+          ) : (
+            <div className="form-group">
+              <label className="form-label">Canonical Institution ID</label>
+              <input className="form-input mono" readOnly value={formData.instId} style={{ background: 'var(--bg-main)', cursor: 'not-allowed' }} />
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Issuer Wallet Address</label>
             <input className="form-input mono" required value={formData.wallet} onChange={e => setFormData({...formData, wallet: e.target.value})} placeholder="0x..." />
