@@ -3,7 +3,6 @@ import { Card, HashDisplay, Badge } from '../components/common/Components';
 import { Search, CheckCircle, XCircle, AlertTriangle, Clock, Shield, ArrowLeft } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 import { useNavigate } from 'react-router-dom';
-import { ethers } from 'ethers';
 
 export default function PublicVerification() {
   const [form, setForm] = useState({ certId: '', hash: '' });
