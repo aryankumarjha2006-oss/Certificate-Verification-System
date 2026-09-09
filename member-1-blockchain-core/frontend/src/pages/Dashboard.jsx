@@ -14,24 +14,19 @@ export default function Dashboard() {
     const loadDashboard = async () => {
       try {
         if (!blockchainService.provider) return;
-        const data = await blockchainService.getAllEvents();
-        const instReg = blockchainService.institutionRegistry;
-        const instFilter2 = instReg.filters.IssuerAuthorized();
-        const eIssuers = await instReg.queryFilter(instFilter2, 0, "latest");
+        const [data, issuersList, instList] = await Promise.all([
+          blockchainService.getAllEvents(),
+          blockchainService.getAllAuthorizedIssuers(),
+          blockchainService.getAllRegisteredInstitutions()
+        ]);
 
-        const parseArg = (val) => {
-          if (typeof val === 'string') return val;
-          if (val && typeof val === 'object' && val.hash) return val.hash;
-          return String(val ?? '');
-        };
-
-        const uniqueIssuers = new Set(eIssuers.map(e => `${parseArg(e.args[0])}-${parseArg(e.args[1])}`)).size;
+        const uniqueIssuers = new Set(issuersList.map(i => `${i.instId}-${i.wallet}`)).size;
 
         setStats({
            totalIssued: data.issued.length,
            revoked: data.revoked.length,
            active: Math.max(0, data.issued.length - data.revoked.length),
-           institutions: data.institutions,
+           institutions: Math.max(data.institutions, instList.length),
            issuers: uniqueIssuers,
            recent: data.issued.slice().sort((a,b) => Number(b.timestamp || 0) - Number(a.timestamp || 0)).slice(0, 5)
         });

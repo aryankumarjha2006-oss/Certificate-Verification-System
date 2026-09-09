@@ -12,7 +12,7 @@ export const issueCertificate = async (req, res) => {
             return res.status(400).json({ error: 'institutionId, certificateId, studentName, and courseName are required' });
         }
         
-        let documentHash = req.body.hash || null;
+        let documentHash = req.body.hash || req.body.documentHash || null;
         if (req.file) {
             documentHash = computeSHA256(req.file.buffer);
         }
@@ -155,25 +155,30 @@ function logVerificationAttempt(certificateId, status, req) {
 export const verifyCertificate = async (req, res) => {
     let certificateId = (req.body.certificateId || '').trim();
     try {
-        if (!req.file) {
-            logVerificationAttempt(certificateId || null, 'MISSING_FILE', req);
-            return res.status(400).json({ error: 'PDF file is required' });
+        let documentHash = null;
+        if (req.file) {
+            documentHash = computeSHA256(req.file.buffer);
+            // Auto-detect Certificate ID from PDF if not manually provided
+            if (!certificateId) {
+                certificateId = extractCertificateIdFromPdf(req.file.buffer);
+            }
+        } else if (req.body.documentHash || req.body.hash) {
+            documentHash = req.body.documentHash || req.body.hash;
         }
 
-        // Auto-detect Certificate ID from PDF if not manually provided
+        if (!documentHash) {
+            logVerificationAttempt(certificateId || null, 'MISSING_FILE', req);
+            return res.status(400).json({ error: 'PDF file or document hash is required' });
+        }
+
         if (!certificateId) {
-            certificateId = extractCertificateIdFromPdf(req.file.buffer);
-            if (!certificateId) {
-                logVerificationAttempt('UNEXTRACTABLE', 'INVALID_INPUT', req);
-                return res.status(400).json({
-                    error: 'Credential ID could not be detected automatically from this PDF. Please enter the Credential ID manually.',
-                    requiresManualId: true
-                });
-            }
-            console.log(`[Verification] Auto-detected Credential ID from PDF: ${certificateId}`);
+            logVerificationAttempt('UNEXTRACTABLE', 'INVALID_INPUT', req);
+            return res.status(400).json({
+                error: 'Credential ID could not be detected automatically from this PDF. Please enter the Credential ID manually.',
+                requiresManualId: true
+            });
         }
         
-        const documentHash = computeSHA256(req.file.buffer);
         const contract = getDigitalCredentialContract();
         
         const status = await contract.verifyCertificate(certificateId, documentHash);
@@ -248,9 +253,9 @@ export const createNewVersion = async (req, res) => {
         if (!institutionId || !certificateId) {
             return res.status(400).json({ error: 'institutionId and certificateId are required' });
         }
-        if (!req.file && !req.body.hash) return res.status(400).json({ error: 'PDF file or hash is required' });
+        const newDocumentHash = req.file ? computeSHA256(req.file.buffer) : (req.body.newDocumentHash || req.body.hash || req.body.documentHash);
+        if (!newDocumentHash) return res.status(400).json({ error: 'PDF file or hash is required' });
         
-        const newDocumentHash = req.file ? computeSHA256(req.file.buffer) : req.body.hash;
         const newExpiryTimestamp = req.body.newExpiryTimestamp ? parseInt(req.body.newExpiryTimestamp) : 0;
         
         const signer = getInstitutionSigner(institutionId);

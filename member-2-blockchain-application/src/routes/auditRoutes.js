@@ -6,5 +6,6 @@ const router = express.Router();
 
 // Protected audit trail route (requires JWT authentication)
 router.get('/events', authenticateToken, getAuditEvents);
+router.get('/trail', authenticateToken, getAuditEvents);
 
 export default router;

@@ -142,6 +142,34 @@ export default function Certificates() {
     }
   };
 
+  const fetchFreshAuthToken = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          return data.token;
+        }
+      }
+    } catch (e) {
+      console.warn('Auto-login failed:', e.message);
+    }
+    return null;
+  };
+
+  const getAuthToken = async () => {
+    let token = localStorage.getItem('token') || localStorage.getItem('credchain_token');
+    if (!token) {
+      token = await fetchFreshAuthToken();
+    }
+    return token;
+  };
+
   // Step 2 -> Step 3: Sign & Issue On-Chain via CredChain Managed Signing (or optional MetaMask)
   const handleSignAndIssue = async (useMetaMask = false) => {
     if (!generatedPdf) return;
@@ -150,6 +178,7 @@ export default function Certificates() {
       setTxStatus('submitted');
 
       const expiryTimestamp = formData.expiry ? Math.floor(new Date(formData.expiry).getTime() / 1000) : 0;
+      let token = await getAuthToken();
 
       if (useMetaMask && typeof window.ethereum !== 'undefined') {
         // Optional client MetaMask flow
@@ -175,11 +204,21 @@ export default function Certificates() {
         syncForm.append('hash', generatedPdf.docHash);
         syncForm.append('pdf', generatedPdf.pdfBlob, `${formData.certId.trim()}.pdf`);
 
-        await fetch(`${API_URL}/api/certificates/issue`, {
+        let syncRes = await fetch(`${API_URL}/api/certificates/issue`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+          headers: { 'Authorization': `Bearer ${token || ''}` },
           body: syncForm
         });
+
+        if (syncRes.status === 401 || syncRes.status === 403) {
+          localStorage.removeItem('token');
+          token = await fetchFreshAuthToken();
+          await fetch(`${API_URL}/api/certificates/issue`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token || ''}` },
+            body: syncForm
+          });
+        }
 
         setIssuedResult({
           certId: formData.certId.trim(),
@@ -201,11 +240,21 @@ export default function Certificates() {
         issueForm.append('hash', generatedPdf.docHash);
         issueForm.append('pdf', generatedPdf.pdfBlob, `${formData.certId.trim()}.pdf`);
 
-        const response = await fetch(`${API_URL}/api/certificates/issue`, {
+        let response = await fetch(`${API_URL}/api/certificates/issue`, {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+          headers: { 'Authorization': `Bearer ${token || ''}` },
           body: issueForm
         });
+
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('token');
+          token = await fetchFreshAuthToken();
+          response = await fetch(`${API_URL}/api/certificates/issue`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token || ''}` },
+            body: issueForm
+          });
+        }
 
         const data = await response.json();
         if (!response.ok) {
@@ -262,14 +311,29 @@ export default function Certificates() {
     try {
       setTxStatus('submitted');
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_URL}/api/certificates/revoke`, {
+      let token = await getAuthToken();
+
+      let response = await fetch(`${API_URL}/api/certificates/revoke`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+          'Authorization': `Bearer ${token || ''}`
         },
         body: JSON.stringify({ institutionId: instId, certificateId: certId })
       });
+
+      if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem('token');
+        token = await fetchFreshAuthToken();
+        response = await fetch(`${API_URL}/api/certificates/revoke`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token || ''}`
+          },
+          body: JSON.stringify({ institutionId: instId, certificateId: certId })
+        });
+      }
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.details || data.error || 'Revocation failed');

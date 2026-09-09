@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
 import { Card, StatCard, Badge } from '../components/common/Components';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/UIStates';
 import {
@@ -42,23 +43,30 @@ export default function Analytics() {
     loadAnalytics();
   }, [blockchainService.provider]);
 
+  const fetchFreshAuthToken = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          return data.token;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not auto-login for analytics token:', e.message);
+    }
+    return null;
+  };
+
   const getAuthToken = async () => {
     let token = localStorage.getItem('token') || localStorage.getItem('credchain_token');
     if (!token) {
-      try {
-        const res = await fetch('http://localhost:3000/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'admin123' })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          token = data.token;
-          localStorage.setItem('token', token);
-        }
-      } catch (e) {
-        console.warn('Could not auto-login for analytics token:', e.message);
-      }
+      token = await fetchFreshAuthToken();
     }
     return token;
   };
@@ -68,11 +76,11 @@ export default function Analytics() {
       setLoading(true);
       setError(null);
 
-      const token = await getAuthToken();
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      let token = await getAuthToken();
+      let headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       // Fetch summary
-      const [sumRes, issueTrendRes, verifyTrendRes, resultsRes, instRes, activityRes] = await Promise.allSettled([
+      let [sumRes, issueTrendRes, verifyTrendRes, resultsRes, instRes, activityRes] = await Promise.allSettled([
         fetch('http://localhost:3000/api/analytics/summary', { headers }),
         fetch('http://localhost:3000/api/analytics/issuance-trends', { headers }),
         fetch('http://localhost:3000/api/analytics/verification-trends', { headers }),
@@ -80,6 +88,22 @@ export default function Analytics() {
         fetch('http://localhost:3000/api/analytics/institutions', { headers }),
         fetch('http://localhost:3000/api/analytics/recent-activity', { headers })
       ]);
+
+      // Check if auth expired (401/403)
+      if (sumRes.status === 'fulfilled' && (sumRes.value.status === 401 || sumRes.value.status === 403)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('credchain_token');
+        token = await fetchFreshAuthToken();
+        headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        [sumRes, issueTrendRes, verifyTrendRes, resultsRes, instRes, activityRes] = await Promise.allSettled([
+          fetch('http://localhost:3000/api/analytics/summary', { headers }),
+          fetch('http://localhost:3000/api/analytics/issuance-trends', { headers }),
+          fetch('http://localhost:3000/api/analytics/verification-trends', { headers }),
+          fetch('http://localhost:3000/api/analytics/verification-results', { headers }),
+          fetch('http://localhost:3000/api/analytics/institutions', { headers }),
+          fetch('http://localhost:3000/api/analytics/recent-activity', { headers })
+        ]);
+      }
 
       let backendOk = false;
 
@@ -128,7 +152,7 @@ export default function Analytics() {
       if (blockchainService.provider) {
         await loadContractFallback();
       } else {
-        setError('Failed to fetch analytics data.');
+        setError('Failed to fetch analytics data. Ensure backend API (port 3000) and Hardhat RPC (port 8545) are running.');
       }
     } finally {
       setLoading(false);
@@ -145,7 +169,7 @@ export default function Analytics() {
       const p2 = instReg.queryFilter(instFilter2, 0, "latest");
 
       const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-      const certReg = new window.ethers.Contract(certRegAddress, [
+      const certReg = new ethers.Contract(certRegAddress, [
         "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
         "event CertificateRevoked(string indexed certificateId)"
       ], blockchainService.provider);

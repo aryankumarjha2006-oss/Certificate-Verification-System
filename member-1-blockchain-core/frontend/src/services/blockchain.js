@@ -122,11 +122,38 @@ class BlockchainService {
   async getAllRegisteredInstitutions() {
     const candidateIds = new Set(['DEMO_INST_01', 'INST-001', 'INST-002', 'UNIV01']);
 
+    // 1. Discover registered institutions from on-chain event logs
+    try {
+      const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+      const regEvents = await contract.queryFilter(contract.filters.InstitutionRegistered(), 0, "latest");
+      regEvents.forEach(e => {
+        if (e.args && e.args[0]) {
+          const rawId = typeof e.args[0] === 'string' ? e.args[0] : String(e.args[0]);
+          if (!rawId.startsWith('0x') || rawId.length !== 66) {
+            candidateIds.add(rawId);
+          }
+        }
+      });
+    } catch(e) {}
+
+    // 2. Discover institutions from database records
     try {
       const res = await fetch('http://localhost:3000/api/certificates');
       if (res.ok) {
         const certs = await res.json();
         certs.forEach(c => { if (c.institutionId) candidateIds.add(c.institutionId); });
+      }
+    } catch(e) {}
+
+    try {
+      const aRes = await fetch('http://localhost:3000/api/audit/events?limit=100');
+      if (aRes.ok) {
+        const aData = await aRes.json();
+        (aData.events || []).forEach(ev => {
+          if (ev.institutionId && !ev.institutionId.startsWith('0x')) {
+            candidateIds.add(ev.institutionId);
+          }
+        });
       }
     } catch(e) {}
 
@@ -160,17 +187,22 @@ class BlockchainService {
       '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
     ]);
 
+    // Discover authorized issuer wallets from institution admin wallets and on-chain events
+    institutions.forEach(inst => {
+      if (inst.wallet && inst.wallet !== '0x000') {
+        candidateWallets.add(inst.wallet);
+      }
+    });
+
     try {
       const authEvents = await contract.queryFilter(contract.filters.IssuerAuthorized(), 0, "latest");
       authEvents.forEach(e => {
-        if (e.args[1]) candidateWallets.add(e.args[1]);
+        if (e.args && e.args[1]) candidateWallets.add(e.args[1]);
       });
     } catch(e) {}
 
     const issuersList = [];
     for (const inst of institutions) {
-      if (inst.wallet) candidateWallets.add(inst.wallet);
-
       for (const wallet of candidateWallets) {
         try {
           const isAuth = await contract.isAuthorizedIssuer(inst.id, wallet);
@@ -252,24 +284,29 @@ class BlockchainService {
         certList = await res.json();
       }
     } catch (e) {
-      console.warn("Could not fetch off-chain certificates, falling back to local/contract state", e);
+      console.warn("Could not fetch off-chain certificates, falling back to contract state", e);
     }
 
+    const discoveredIds = new Set(certList.map(c => c.id).filter(Boolean));
+
+    // Also discover on-chain CertificateIssued events directly
     try {
-      const local = JSON.parse(localStorage.getItem('credchain_local_certs') || '[]');
-      for (const lc of local) {
-        if (!certList.find(c => c.id === lc.id)) {
-          certList.push(lc);
+      const certRegAddress = await this.digitalCredential.certificateRegistry();
+      const certReg = new ethers.Contract(certRegAddress, [
+        "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)"
+      ], this.provider);
+      const issuedEvents = await certReg.queryFilter(certReg.filters.CertificateIssued(), 0, "latest");
+      for (const ev of issuedEvents) {
+        if (ev.args && ev.args[0] && typeof ev.args[0] === 'string' && !ev.args[0].startsWith('0x')) {
+          discoveredIds.add(ev.args[0]);
         }
       }
-    } catch (e) {}
+    } catch(e) {}
 
     const enriched = [];
     const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
 
-    for (const cert of certList) {
-      const certId = cert.id;
-      if (!certId) continue;
+    for (const certId of discoveredIds) {
       try {
         const onChain = await contract.getCertificate(certId);
         if (onChain && (onChain[7] ?? onChain.exists)) {
@@ -277,6 +314,7 @@ class BlockchainService {
           const expiryTimestamp = Number(onChain[4] ?? onChain.expiryTimestamp ?? 0);
           const statusNum = Number(onChain[5] ?? onChain.status ?? 0);
           const versionNum = Number(onChain[6] ?? onChain.version ?? 1);
+          const meta = certList.find(c => c.id === certId) || {};
 
           enriched.push({
             certId: String(onChain[0] || certId),
@@ -285,7 +323,7 @@ class BlockchainService {
             expiryTimestamp,
             status: statusNum === 1 ? 'REVOKED' : 'ACTIVE',
             version: versionNum,
-            institutionId: String(onChain[8] || onChain.institutionId || cert.institutionId || ''),
+            institutionId: String(onChain[8] || onChain.institutionId || meta.institutionId || ''),
             hash: String(onChain[1] || onChain.certificateHash || '')
           });
         }
