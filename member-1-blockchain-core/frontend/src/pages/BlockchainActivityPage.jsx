@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ethers } from 'ethers';
 import { Card, Badge, HashDisplay, Modal } from '../components/common/Components';
 import { LoadingState, EmptyState, ErrorState } from '../components/common/UIStates';
 import { Activity, Search, Filter, ChevronLeft, ChevronRight, Eye, ExternalLink, ShieldCheck, Layers } from 'lucide-react';
@@ -26,23 +27,30 @@ export default function BlockchainActivityPage() {
     loadAuditEvents(page, selectedEventType, selectedSource, searchTerm);
   }, [page, selectedEventType, selectedSource, searchTerm, blockchainService.provider]);
 
+  const fetchFreshAuthToken = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin123' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+          return data.token;
+        }
+      }
+    } catch (e) {
+      console.warn('Auto-login for audit token failed:', e.message);
+    }
+    return null;
+  };
+
   const getAuthToken = async () => {
     let token = localStorage.getItem('token') || localStorage.getItem('credchain_token');
     if (!token) {
-      try {
-        const res = await fetch('http://localhost:3000/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: 'admin', password: 'admin123' })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          token = data.token;
-          localStorage.setItem('token', token);
-        }
-      } catch (e) {
-        console.warn('Auto-login for audit token failed:', e.message);
-      }
+      token = await fetchFreshAuthToken();
     }
     return token;
   };
@@ -52,8 +60,8 @@ export default function BlockchainActivityPage() {
       setLoading(true);
       setError(null);
 
-      const token = await getAuthToken();
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      let token = await getAuthToken();
+      let headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
       const params = new URLSearchParams({
         page: pageNum,
@@ -63,7 +71,16 @@ export default function BlockchainActivityPage() {
         ...(search.trim() !== '' && { search: search.trim() })
       });
 
-      const res = await fetch(`http://localhost:3000/api/audit/events?${params.toString()}`, { headers });
+      let res = await fetch(`http://localhost:3000/api/audit/events?${params.toString()}`, { headers });
+
+      // If token was expired or invalid (401/403), clear stored tokens and retry with a fresh token
+      if (res.status === 401 || res.status === 403) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('credchain_token');
+        token = await fetchFreshAuthToken();
+        headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        res = await fetch(`http://localhost:3000/api/audit/events?${params.toString()}`, { headers });
+      }
 
       if (!res.ok) {
         throw new Error(`Audit API error: ${res.status} ${res.statusText}`);
@@ -80,7 +97,7 @@ export default function BlockchainActivityPage() {
       if (blockchainService.provider) {
         await loadContractEventsFallback();
       } else {
-        setError('The audit service could not be reached. Check that the backend and local blockchain are running.');
+        setError('The audit service could not be reached. Ensure backend server (port 3000) and Hardhat RPC (port 8545) are running.');
       }
     } finally {
       setLoading(false);
@@ -89,9 +106,12 @@ export default function BlockchainActivityPage() {
 
   const loadContractEventsFallback = async () => {
     try {
+      if (!blockchainService.provider) {
+        throw new Error("No blockchain provider connected");
+      }
       const instReg = blockchainService.institutionRegistry;
       const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-      const certReg = new window.ethers.Contract(certRegAddress, [
+      const certReg = new ethers.Contract(certRegAddress, [
         "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)",
         "event CertificateRevoked(string indexed certificateId)"
       ], blockchainService.provider);
@@ -121,7 +141,8 @@ export default function BlockchainActivityPage() {
       setPagination({ page: 1, limit: combined.length, total: combined.length, totalPages: 1 });
       setLatestBlock(combined.length > 0 ? Math.max(...combined.map(e => e.blockNumber)) : 0);
     } catch (e) {
-      setError('Unable to load blockchain events from network.');
+      console.error('loadContractEventsFallback error:', e);
+      setError('Unable to load blockchain events from network. Ensure backend server (port 3000) and Hardhat RPC (port 8545) are running.');
     }
   };
 
