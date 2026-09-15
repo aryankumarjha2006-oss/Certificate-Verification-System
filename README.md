@@ -8,59 +8,67 @@
 ![Ethers.js](https://img.shields.io/badge/Ethers.js-v6.17.0-2535a0?style=flat-square)
 ![SQLite](https://img.shields.io/badge/SQLite-^5.1.7-003B57?style=flat-square&logo=sqlite)
 ![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react)
-![Vite](https://img.shields.io/badge/Vite-^5.2.0-646CFF?style=flat-square&logo=vite)
+![Vite](https://img.shields.io/badge/Vite-^6.1.0-646CFF?style=flat-square&logo=vite)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-**CredChain** is a hybrid blockchain-backed digital credential verification and lifecycle management system. It combines the cryptographic immutability of Ethereum smart contracts with an Express.js application layer and an off-chain SQLite store. By processing certificate PDF documents in memory to compute deterministic SHA-256 digests, CredChain establishes tamper-evident cryptographic proofs on-chain while keeping student Personally Identifiable Information (PII) private and off-chain.
+**CredChain** is a hybrid blockchain-backed digital credential verification and lifecycle management system. It combines the cryptographic immutability and decentralized access control of Ethereum smart contracts (Solidity `^0.8.20`) with an Express.js backend application layer, an off-chain SQLite store, and modern web interfaces (React 19 / Vite administrative platform and zero-friction public verification portals).
+
+By processing certificate PDF documents in memory to compute deterministic SHA-256 cryptographic digests, CredChain establishes tamper-evident proofs on-chain while keeping student Personally Identifiable Information (PII) private and strictly off-chain.
 
 ---
 
 ## Table of Contents
-1. [Overview](#1-overview)
+1. [Executive Overview](#1-executive-overview)
 2. [Problem Statement](#2-problem-statement)
-3. [Proposed Solution](#3-proposed-solution)
-4. [Key Features](#4-key-features)
-5. [How the System Works](#5-how-the-system-works)
-6. [System Architecture](#6-system-architecture)
-7. [Smart Contract Architecture](#7-smart-contract-architecture)
-8. [Data Architecture](#8-data-architecture)
-9. [Certificate Lifecycle](#9-certificate-lifecycle)
-10. [Verification Architecture](#10-verification-architecture)
-11. [QR Code Verification](#11-qr-code-verification)
-12. [Security Architecture](#12-security-architecture)
-13. [Authentication & Authorization](#13-authentication--authorization)
-14. [REST API Reference](#14-rest-api-reference)
-15. [Database Architecture](#15-database-architecture)
-16. [Repository Structure](#16-repository-structure)
-17. [Member Responsibilities](#17-member-responsibilities)
-18. [Technology Stack](#18-technology-stack)
-19. [Installation & Setup](#19-installation--setup)
-20. [Environment Variables](#20-environment-variables)
-21. [Testing & Validation](#21-testing--validation)
-22. [Security Testing](#22-security-testing)
-23. [Step-by-Step Demo Flow](#23-step-by-step-demo-flow)
-24. [Current Limitations (v1.0.0)](#24-current-limitations-v100)
-25. [Future Scope](#25-future-scope)
-26. [Technical Design Decisions (Viva Preparation)](#26-technical-design-decisions-viva-preparation)
-27. [Project Results](#27-project-results)
-28. [Blockchain Guarantees vs Non-Guarantees](#28-blockchain-guarantees-vs-non-guarantees)
-29. [License](#29-license)
-30. [Authors & Project Team](#30-authors--project-team)
-31. [Related Documentation](#31-related-documentation)
+3. [Proposed Solution & Core Concept](#3-proposed-solution--core-concept)
+4. [Why Blockchain Is Used](#4-why-blockchain-is-used)
+5. [Key System Features](#5-key-system-features)
+6. [Complete Credential Lifecycle](#6-complete-credential-lifecycle)
+7. [System Architecture](#7-system-architecture)
+8. [Two-Member Project Structure](#8-two-member-project-structure)
+9. [Repository Structure](#9-repository-structure)
+10. [Smart Contract Architecture (Member 1)](#10-smart-contract-architecture-member-1)
+11. [On-Chain vs Off-Chain Data Architecture](#11-on-chain-vs-off-chain-data-architecture)
+12. [Certificate Hashing & Integrity Verification](#12-certificate-hashing--integrity-verification)
+13. [Issuance Flow](#13-issuance-flow)
+14. [Verification Flow](#14-verification-flow)
+15. [QR Code Verification](#15-qr-code-verification)
+16. [Revocation, Expiration & Versioning](#16-revocation-expiration--versioning)
+17. [Institution & Issuer Authorization Model](#17-institution--issuer-authorization-model)
+18. [Managed Institutional Blockchain Signing](#18-managed-institutional-blockchain-signing)
+19. [Backend Architecture (Member 2)](#19-backend-architecture-member-2)
+20. [Frontend Platforms (Member 1 & Member 2)](#20-frontend-platforms-member-1--member-2)
+21. [Database Schema & Event Indexer](#21-database-schema--event-indexer)
+22. [Unified Audit Trail & Telemetry](#22-unified-audit-trail--telemetry)
+23. [Analytics Engine](#23-analytics-engine)
+24. [REST API Reference](#24-rest-api-reference)
+25. [Security Threat Model & Defenses](#25-security-threat-model--defenses)
+26. [Network Configuration (Hardhat & Sepolia)](#26-network-configuration-hardhat--sepolia)
+27. [Canonical Institutions & Test Fixture Model](#27-canonical-institutions--test-fixture-model)
+28. [Installation & Setup](#28-installation--setup)
+29. [Environment Variables](#29-environment-variables)
+30. [Testing & Validation](#30-testing--validation)
+31. [Step-by-Step Demonstration Flow](#31-step-by-step-demonstration-flow)
+32. [Limitations & Deployment Notes](#32-limitations--deployment-notes)
+33. [Future Scope](#33-future-scope)
+34. [Technical Viva Q&A Guide](#34-technical-viva-qa-guide)
+35. [Blockchain Guarantees vs Non-Guarantees](#35-blockchain-guarantees-vs-non-guarantees)
+36. [Technology Stack](#36-technology-stack)
+37. [License & Project Team](#37-license--project-team)
 
 ---
 
-## 1. Overview
+## 1. Executive Overview
 
-Credential verification in academic and corporate environments is plagued by widespread document forgery, slow manual background checks, and fragile centralized databases. 
+Credential verification in academic, governmental, and corporate ecosystems faces severe challenges: widespread document forgery, fraudulent diploma mills, slow manual background checks, and fragile centralized databases susceptible to unilateral modification or data loss.
 
-CredChain introduces a **hybrid blockchain architecture**:
-- **On-Chain (Blockchain Trust Anchor):** Stores only cryptographic SHA-256 hashes, institution identifiers, issuer addresses, timestamp metadata, version sequences, and revocation flags. **Raw certificate files are never stored on the blockchain.**
-- **Off-Chain (Application & Privacy Layer):** Handles in-memory PDF parsing, student metadata storage, JWT-authenticated institution workflows, zero-auth public verifier interfaces, QR code generation, and verification audit logging.
+CredChain addresses these vulnerabilities through a **hybrid on-chain/off-chain trust architecture**:
+* **On-Chain (Blockchain Trust Anchor):** Stores cryptographic SHA-256 document digests, unique certificate identifiers, authorized institutional issuer wallet addresses, timestamp metadata, version sequences, and immutable revocation flags. **Complete certificate PDF files and student PII are NEVER stored on the blockchain.**
+* **Off-Chain (Application & Privacy Layer):** Handles in-memory PDF parsing, student metadata storage, JWT-authenticated administrative workflows, zero-wallet public verifier interfaces, QR code generation, real-time blockchain event synchronization, and verification telemetry audit logging.
 
-```text
+```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           HYBRID DATA MODEL                             │
+│                       HYBRID TRUST & DATA MODEL                         │
 │                                                                         │
 │   ON-CHAIN (Ethereum / EVM)          OFF-CHAIN (SQLite / Express)       │
 │   ┌───────────────────────────┐      ┌──────────────────────────────┐   │
@@ -70,6 +78,7 @@ CredChain introduces a **hybrid blockchain architecture**:
 │   │ • Institution ID Binding  │      │ • Verification Audit Logs    │   │
 │   │ • Version History Tree    │      │   (Timestamp, IP, Result)    │   │
 │   │ • Revocation State        │      │ • Transient PDF Buffer (RAM) │   │
+│   │ • Expiration Timestamp    │      │ • Synchronized Event Cache   │   │
 │   └───────────────────────────┘      └──────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -78,26 +87,28 @@ CredChain introduces a **hybrid blockchain architecture**:
 
 ## 2. Problem Statement
 
-1. **Certificate Forgery & Tampering:** Digital PDFs can be effortlessly edited using desktop graphic tools. Modifying a student's name, grade, or degree title is undetectable to visual inspection alone.
-2. **Centralized Database Vulnerabilities:** Traditional verification portals store credentials in centralized relational databases susceptible to SQL injection, administrative tampering, unauthorized modifications, and server outages.
-3. **Cross-Institutional Insecurity:** In multi-tenant academic portals, lack of strict cryptographic ownership checks can allow unauthorized institutions to revoke or alter records belonging to other universities.
-4. **Historical Version Ambiguity:** When an academic transcript or degree is legitimately updated (e.g. grade revisions or name corrections), centralized databases often overwrite past records without maintaining a verifiable on-chain audit trail.
-5. **Slow and Friction-Heavy Verification:** Background verification often requires verifiers to register accounts, pay subscription fees, or install cryptocurrency wallet browser extensions.
+1. **Document Forgery & Modification:** Digital PDFs can be altered in seconds using desktop PDF editors. Changing a graduate's name, GPA, degree classification, or issuance date is impossible to catch through visual inspection alone.
+2. **Centralized Database Vulnerabilities:** Traditional verification portals store credentials in centralized relational databases. These represent single points of failure vulnerable to SQL injection, administrative tampering, rogue database administrators, and infrastructure outages.
+3. **Cross-Institutional Insecurity:** In multi-tenant verification systems, a lack of cryptographic boundaries can allow an authorized user from University B to modify or revoke credentials belonging to University A.
+4. **Historical Version Ambiguity:** When an academic transcript is legitimately revised (e.g., grade revisions or legal name corrections), centralized systems often overwrite records, destroying the audit trail of past legitimate versions.
+5. **Verification Friction:** Most decentralized Web3 systems require employers and background verifiers to install browser wallet extensions (such as MetaMask), hold cryptocurrency, and pay gas fees simply to verify a document.
 
 ---
 
-## 3. Proposed Solution
+## 3. Proposed Solution & Core Concept
 
-CredChain implements an end-to-end credential lifecycle:
+CredChain implements a complete digital credential lifecycle with zero verification friction:
 
-```text
-[ Issuer Login ] ➔ [ Upload Certificate PDF ] ➔ [ Compute In-Memory SHA-256 ]
+> **Core Philosophy:** *“We are not putting certificates on a blockchain. We are building a trusted lifecycle for digital credentials, with blockchain serving as the trust layer.”*
+
+```
+[ Issuer Login ] ➔ [ Input Details / Upload PDF ] ➔ [ Compute In-Memory SHA-256 ]
         │
         ▼
-[ Record On-Chain Hash via Smart Contract ] ➔ [ Store Student Metadata in SQLite ]
+[ Record On-Chain Hash via Smart Contract ] ➔ [ Cache Off-Chain Metadata in SQLite ]
         │
         ▼
-[ Generate Zero-PII QR Code ] ➔ [ Distribute PDF & QR to Student ]
+[ Generate Zero-PII QR Code ] ➔ [ Deliver Cryptographic PDF to Graduate ]
         │
         ▼
 [ Public Verifier Scans QR / Uploads PDF ] ➔ [ Compute Hash & Query Smart Contract ]
@@ -106,278 +117,476 @@ CredChain implements an end-to-end credential lifecycle:
 [ Return Deterministic Status: VALID | TAMPERED | REVOKED | EXPIRED | NOT_FOUND ]
         │
         ▼
-[ Record Client IP & Result in Off-Chain Audit Log ]
+[ Record Verification Telemetry in Off-Chain Audit Log ]
 ```
 
 ---
 
-## 4. Key Features
+## 4. Why Blockchain Is Used
 
-### 4.1 Blockchain Core (Member 1)
-- **Institution Registry (`InstitutionRegistry.sol`):** Platform-level registration, authority wallet binding, and deactivation of accredited institutions.
-- **Role-Based Issuer Whitelisting:** Institution authority wallets dynamically authorize or revoke designated issuer wallet addresses.
-- **Cryptographic Certificate Issuance (`CertificateRegistry.sol`):** Records certificate ID, SHA-256 hash digest, issuer wallet address, issuance timestamp, expiration timestamp, and institution ID.
-- **Cryptographic Verification:** Gas-free `view` function comparing document hashes against on-chain records.
-- **On-Chain Versioning:** Incremental version counters with historical version snapshot mappings (`certificateVersions[id][version]`).
-- **Cryptographic Revocation:** Permanent state invalidation with `CertificateRevoked` event emission.
-- **Cross-Institution Security:** Strict validation enforcing that only the issuing institution's authorized wallets can modify or revoke a certificate.
-- **Facade Architecture (`DigitalCredential.sol`):** A unified facade simplifying multi-contract interactions.
+Blockchain is utilized exclusively for the operations where decentralized, tamper-evident trust is essential:
 
-### 4.2 Application & Integration (Member 2)
-- **JWT Authentication:** Secure issuer authentication guarding mutating API routes (`/api/certificates/issue`, `/revoke`, `/version`, `/audit`).
-- **In-Memory Hashing (`hashService.js`):** High-speed SHA-256 hashing directly from Node.js `Buffer` in RAM without writing temporary PDFs to disk.
-- **Public Verification Engine:** Zero-auth public verification endpoint (`POST /api/certificates/verify`) accessible to employers, background check agencies, and universities without crypto wallets.
-- **QR Code Generator:** Base64 Data URL QR generation encoding the public verification URL.
-- **Real-Time Event Synchronizer (`eventListener.js`):** Background Ethers.js event listener that captures on-chain events and automatically synchronizes SQLite records.
-- **Off-Chain Audit Logging:** Tracks verification attempts with timestamps, client IP addresses, user-agents, and verification outcomes.
-
-### 4.3 Deterministic Verification Outcomes
-| Status | Meaning |
-| :--- | :--- |
-| **`VALID`** | Certificate ID exists, document SHA-256 hash exactly matches the active on-chain hash, status is active, and expiration timestamp has not passed. |
-| **`TAMPERED`** | Certificate ID exists on-chain, but the uploaded PDF produces a SHA-256 hash that does not match the registered hash. |
-| **`REVOKED`** | Certificate ID exists, but the issuing institution has explicitly revoked the credential. |
-| **`EXPIRED`** | Certificate ID exists, but the current block timestamp exceeds the registered expiration timestamp. |
-| **`NOT_FOUND`** | Certificate ID does not exist in the smart contract registry. |
+1. **Cryptographic Proof of Existence:** The smart contract records the exact SHA-256 hash at a specific block number and timestamp, proving that the certificate existed in that precise state at that moment.
+2. **Decentralized Access Control:** Smart contracts cryptographically enforce that only wallets whitelisted by an accredited institution can issue, version, or revoke credentials.
+3. **Immutable Revocation & Version History:** Once a credential is revoked or versioned on-chain, that state change cannot be rewritten, hidden, or deleted by any system administrator.
+4. **Zero-Trust Public Verification:** Anyone in the world can independently call the smart contract's read-only `verifyCertificate` function for free without trusting CredChain's backend server or database.
 
 ---
 
-## 5. How the System Works
+## 5. Key System Features
 
-### 5.1 Certificate Issuance Workflow
-1. An authorized institution issuer logs in to the Issuer Portal (`/index.html`) using their credentials, receiving a signed JWT.
-2. The issuer fills in the certificate metadata (`studentName`, `courseName`, `certificateId`, `institutionId`) and uploads the candidate PDF document.
-3. The Express backend receives the multipart form data using Multer in memory (`req.file.buffer`).
-4. `hashService.js` computes the SHA-256 hash as a `0x`-prefixed 64-character hex string.
-5. The backend dispatches a transaction to `DigitalCredential.issueCertificate(institutionId, certificateId, hash, expiryTimestamp)`.
-6. The smart contract validates that the caller is an authorized issuer for `institutionId` and writes the record to on-chain storage.
-7. The backend writes student metadata to the SQLite `certificates` table.
-8. A verification QR code encoding `http://<host>/verify.html?id=<certificateId>` is generated and returned to the issuer.
+### 5.1 Blockchain Core (Member 1)
+* **Institution Registry (`InstitutionRegistry.sol`):** Platform-level registration, authority wallet binding, and deactivation of accredited universities.
+* **Role-Based Issuer Whitelisting:** Institution authority wallets dynamically authorize or revoke designated issuer wallet addresses.
+* **Cryptographic Certificate Issuance (`CertificateRegistry.sol`):** Records certificate ID, SHA-256 hash digest, issuer wallet address, issuance timestamp, expiration timestamp, and institution ID.
+* **Cryptographic Verification (`verifyCertificate`):** Gas-free `view` function evaluating document authenticity, integrity, revocation, and expiration on-chain.
+* **On-Chain Versioning:** Incremental version counters with historical version snapshot mappings (`certificateVersions[id][version]`).
+* **Cryptographic Revocation:** Permanent state invalidation with `CertificateRevoked` event emission.
+* **Cross-Institution Security:** Strict validation enforcing that only the issuing institution's authorized wallets can modify or revoke a certificate.
+* **Unified Facade Architecture (`DigitalCredential.sol`):** Single entry point coordinating between registry contracts.
 
-### 5.2 Public Verification Workflow
-1. A verifier navigates to `/verify.html` (or scans the certificate QR code, which auto-fills the `certificateId`).
-2. The verifier uploads the certificate PDF document and clicks **Verify Certificate**.
-3. The backend hashes the uploaded PDF buffer using SHA-256.
-4. The backend calls `DigitalCredential.verifyCertificate(certificateId, hash)` via JSON-RPC.
-5. The smart contract evaluates existence, hash matching, revocation status, and expiration, returning the deterministic status string.
-6. The backend logs the client IP, timestamp, user-agent, and status outcome in `verification_logs`.
-7. The frontend renders a color-coded status badge with certificate version and metadata.
-
----
-
-## 6. System Architecture
-
-```mermaid
-graph TD
-    subgraph User Layer
-        Issuer[Authorized Issuer]
-        Verifier[Public Verifier / Employer]
-    end
-
-    subgraph Presentation Layer
-        Portal[Member 2 Issuer Portal: index.html]
-        VPortal[Member 2 Public Verifier: verify.html]
-        M1FE[Member 1 CredChain React Platform]
-    end
-
-    subgraph Application Layer - Member 2
-        Server[Express.js Server: port 3000]
-        AuthMid[JWT Auth Middleware]
-        HashSvc[SHA-256 In-Memory Service]
-        QRSvc[QR Code Generator]
-        EvtSync[Ethers.js Event Synchronizer]
-        SQLite[(SQLite Database: database.sqlite)]
-    end
-
-    subgraph Smart Contract Layer - Member 1
-        Facade[DigitalCredential.sol - Facade]
-        InstReg[InstitutionRegistry.sol - Access Control]
-        CertReg[CertificateRegistry.sol - State & Lifecycle]
-    end
-
-    subgraph Blockchain Infrastructure
-        Hardhat[Hardhat Local Node: RPC 127.0.0.1:8545]
-    end
-
-    Issuer -->|Login & Issue| Portal
-    Verifier -->|Upload PDF & Scan QR| VPortal
-    Portal -->|POST with JWT| Server
-    VPortal -->|POST Public| Server
-    M1FE -->|Direct JSON-RPC View| Hardhat
-
-    Server --> AuthMid
-    Server --> HashSvc
-    Server --> QRSvc
-    Server --> SQLite
-    EvtSync --> SQLite
-
-    Server -->|Ethers.js v6 Tx / Query| Facade
-    Facade --> InstReg
-    Facade --> CertReg
-    CertReg -->|Cross-Inst. Check| InstReg
-    CertReg -.->|Emits Events| EvtSync
-    Facade --> Hardhat
-```
+### 5.2 Application & Verification Engine (Member 2)
+* **Managed Institutional Signing:** Server-side institutional wallet management enabling seamless issuance without requiring browser wallet extensions or gas management.
+* **In-Memory Hashing (`hashService.js`):** High-speed SHA-256 hashing directly from Node.js `Buffer` in RAM without writing temporary PDFs to disk.
+* **Zero-Friction Public Verification:** Zero-auth public verification endpoint (`POST /api/certificates/verify`) and web portal (`verify.html`) accessible to any employer or verifier.
+* **QR Code Generator:** Base64 Data URL QR generation encoding the public verification URL.
+* **Real-Time Event Synchronizer (`eventListener.js`):** Background Ethers.js event listener capturing on-chain events and synchronizing SQLite records.
+* **Unified Audit Trail & Telemetry:** Distinguishes on-chain lifecycle events (`Source: Blockchain`) from non-state-changing verification queries (`Source: Application Verification Log`).
+* **Analytics Engine:** Hybrid analytics aggregating on-chain issuance states and off-chain verification telemetry.
 
 ---
 
-## 7. Smart Contract Architecture
-
-### 7.1 `InstitutionRegistry.sol`
-- **Responsibilities:**
-  - Manages accredited institutions (`id`, `name`, `wallet`, `isActive`, `exists`).
-  - Platform administrator (deployer) registers and deactivates institutions via OpenZeppelin `Ownable`.
-  - Institution authority wallets authorize and revoke operational issuer addresses (`authorizedIssuers[instId][issuerAddr]`).
-  - Exposes `isAuthorizedIssuer(string instId, address issuer)` for access validation.
-
-### 7.2 `CertificateRegistry.sol`
-- **Responsibilities:**
-  - Stores on-chain certificate state in `struct Certificate`.
-  - Enforces `onlyFacade` modifier so that state changes occur only via `DigitalCredential.sol`.
-  - Implements multi-status verification logic (`verifyCertificate`).
-  - Manages historical version snapshots in `certificateVersions[id][version]`.
-  - Implements strict cross-institution checks during revocation and version updates.
-
-### 7.3 `DigitalCredential.sol`
-- **Responsibilities:**
-  - Acts as a unified entry point and facade for external callers.
-  - Coordinates between `InstitutionRegistry` and `CertificateRegistry`.
-  - Exposes clean interfaces for issuance, verification, revocation, and version queries.
-
----
-
-## 8. Data Architecture
-
-```text
-┌──────────────────────────────────────┐     ┌──────────────────────────────────────┐
-│           ON-CHAIN DATA              │     │           OFF-CHAIN DATA             │
-│        (Ethereum Blockchain)         │     │         (SQLite Database)            │
-├──────────────────────────────────────┤     ├──────────────────────────────────────┤
-│ • certificateId (string)             │     │ • id (TEXT PRIMARY KEY)              │
-│ • certificateHash (string: 0x...)    │     │ • studentName (TEXT)                 │
-│ • issuer (address)                   │     │ • courseName (TEXT)                  │
-│ • issueTimestamp (uint256)           │     │ • issueDate (TEXT: ISO8601)          │
-│ • expiryTimestamp (uint256)          │     │ • institutionId (TEXT)               │
-│ • status (enum: ACTIVE, REVOKED)     │     │ • status (TEXT: VALID, REVOKED)      │
-│ • version (uint256)                  │     │ • verification_logs (Table):         │
-│ • institutionId (string)             │     │   - id, certificateId, timestamp     │
-│ • exists (bool)                      │     │   - status, ipAddress, userAgent     │
-│ • certificateVersions (mapping)      │     │                                      │
-└──────────────────────────────────────┘     └──────────────────────────────────────┘
-```
-
-### Why Raw PDFs Are Not Stored On-Chain
-1. **Storage Prohibitions:** A single 1 MB PDF costs immense gas on public networks and exceeds EVM storage design guidelines.
-2. **Mathematical Equivalence:** A 256-bit SHA-256 hash is collision-resistant and cryptographically proves whether a file is identical to the issued document.
-3. **Data Privacy (GDPR/FERPA):** Storing raw PDFs exposes immutable student grades and personal information publicly. Hashing ensures privacy.
-
----
-
-## 9. Certificate Lifecycle
+## 6. Complete Credential Lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> Active_V1 : issueCertificate()
     
-    Active_V1 --> Valid_V1 : verifyCertificate(PDF_V1)
-    Active_V1 --> Tampered : verifyCertificate(Modified_PDF)
-    Active_V1 --> Expired : verifyCertificate() [block.timestamp > expiry]
+    Active_V1 --> Valid_V1 : verifyCertificate(PDF_V1) -> VALID
+    Active_V1 --> Tampered : verifyCertificate(Modified_PDF) -> TAMPERED
+    Active_V1 --> Expired : verifyCertificate() [block.timestamp > expiry] -> EXPIRED
     
     Active_V1 --> Active_V2 : createNewVersion(PDF_V2)
-    Active_V2 --> Valid_V2 : verifyCertificate(PDF_V2)
-    Active_V2 --> Tampered : verifyCertificate(PDF_V1)
+    Active_V2 --> Valid_V2 : verifyCertificate(PDF_V2) -> VALID (Version 2)
+    Active_V2 --> Tampered : verifyCertificate(PDF_V1) -> TAMPERED
     
     Active_V1 --> Revoked : revokeCertificate()
     Active_V2 --> Revoked : revokeCertificate()
     
-    Revoked --> Revoked : verifyCertificate() returns REVOKED
+    Revoked --> Revoked : verifyCertificate() -> REVOKED
     Revoked --> [*]
 ```
 
+### Deterministic Verification States
+| Status | EVM Evaluation Condition | Meaning |
+| :--- | :--- | :--- |
+| **`VALID`** | Certificate ID exists, SHA-256 matches active on-chain hash, `status == ACTIVE`, and `block.timestamp <= expiryTimestamp`. | The document is authentic, untampered, active, and issued by an authorized institution. |
+| **`TAMPERED`** | Certificate ID exists, but presented SHA-256 hash does not match registered on-chain hash. | The PDF document has been modified after issuance. |
+| **`REVOKED`** | Certificate ID exists and presented hash matches, but `status == REVOKED`. | The issuing institution explicitly invalidated the credential. |
+| **`EXPIRED`** | Certificate ID exists and presented hash matches, but `expiryTimestamp > 0` and `block.timestamp > expiryTimestamp`. | The credential has passed its validity window. |
+| **`NOT_FOUND`** | Certificate ID does not exist in `certificates` mapping. | No credential with this identifier was ever registered on-chain. |
+
 ---
 
-## 10. Verification Architecture
+## 7. System Architecture
 
-The smart contract evaluates certificate validity in the following deterministic sequence:
+```mermaid
+graph TD
+    subgraph User & Presentation Layer
+        Admin[University Administrator / Issuer]
+        Verifier[Public Verifier / Employer / Student]
+        ReactUI[Member 1: React 19 / Vite Platform: port 5173]
+        PublicUI[Member 2: Public Verifier Portal: verify.html]
+        IssuerUI[Member 2: Issuer Portal: index.html]
+    end
 
-```solidity
-function verifyCertificate(string memory _certificateId, string memory _certificateHash) external view returns (string memory) {
-    if (!certificates[_certificateId].exists) return "NOT_FOUND";
-    
-    Certificate memory cert = certificates[_certificateId];
-    
-    if (keccak256(bytes(cert.certificateHash)) != keccak256(bytes(_certificateHash))) return "TAMPERED";
-    if (cert.status == CertificateStatus.REVOKED) return "REVOKED";
-    if (cert.expiryTimestamp > 0 && block.timestamp > cert.expiryTimestamp) return "EXPIRED";
-    
-    return "VALID";
-}
+    subgraph Application & Signing Layer - Member 2
+        ExpressServer[Express.js REST API: port 3000]
+        AuthGuard[JWT Auth Middleware]
+        SignerLayer[Managed Institutional Signer: getInstitutionSigner]
+        HashEngine[SHA-256 In-Memory Buffer Engine]
+        QREngine[QR Code Generator Service]
+        SyncEngine[Ethers.js Real-Time Event Synchronizer]
+        SQLiteDB[(SQLite Database: database.sqlite)]
+    end
+
+    subgraph Smart Contract Trust Layer - Member 1
+        FacadeContract[DigitalCredential.sol - Facade]
+        InstRegistry[InstitutionRegistry.sol - Access Control]
+        CertRegistry[CertificateRegistry.sol - State & Lifecycle]
+    end
+
+    subgraph Blockchain Infrastructure
+        HardhatNode[Hardhat Local Node: Chain ID 31337]
+        SepoliaNet[Optional: Ethereum Sepolia: Chain ID 11155111]
+    end
+
+    Admin -->|Manage / Issue / Web3| ReactUI
+    Admin -->|Login & Issue| IssuerUI
+    Verifier -->|Upload PDF & Scan QR| PublicUI
+    Verifier -->|Verify Web3 Direct| ReactUI
+
+    ReactUI -->|JSON-RPC Direct Read| HardhatNode
+    ReactUI -->|API Calls| ExpressServer
+    PublicUI -->|POST /api/certificates/verify| ExpressServer
+    IssuerUI -->|POST /api/certificates/issue| ExpressServer
+
+    ExpressServer --> AuthGuard
+    ExpressServer --> HashEngine
+    ExpressServer --> QREngine
+    ExpressServer --> SignerLayer
+    ExpressServer --> SQLiteDB
+    SyncEngine --> SQLiteDB
+
+    SignerLayer -->|Ethers.js Signed Tx| FacadeContract
+    ExpressServer -->|Read-Only Call| FacadeContract
+    FacadeContract --> InstRegistry
+    FacadeContract --> CertRegistry
+    CertRegistry -->|Cross-Institution Verification| InstRegistry
+    CertRegistry -.->|Emits On-Chain Events| SyncEngine
+    FacadeContract --> HardhatNode
+    FacadeContract -.-> SepoliaNet
 ```
 
 ---
 
-## 11. QR Code Verification
+## 8. Two-Member Project Structure
 
-- **QR Payload Format:** `http://<host>:<port>/verify.html?id=<certificateId>`
-- **Privacy Guarantees:**
-  - Zero PII (no names, marks, or degree details).
-  - Zero JWTs, private keys, or secret tokens.
-  - Zero raw PDF binaries.
-- **Verification Interaction:** When scanned, the verifier's browser opens the Public Verifier portal with the certificate ID pre-filled. The verifier then uploads the physical/digital PDF document to execute cryptographic verification.
+The project strictly maintains two intentional ownership boundaries representing the division of responsibilities:
+
+```
+member-1-blockchain-core/             member-2-blockchain-application/
+        │                                     │
+        ▼                                     ▼
+Blockchain Core / Trust Layer          Application / Verification Layer
+• Solidity Smart Contracts             • Express.js REST API Server
+• Hardhat EVM Configuration            • Managed Institutional Signing
+• Security Access Control              • In-Memory SHA-256 Hashing
+• Unit & Security Test Suite           • SQLite Off-Chain Database
+• React 19 / Vite Web Platform         • Real-Time Event Synchronizer
+• Client-Side jsPDF Generator          • Public Verifier & Issuer Portals
+```
+
+### Detailed Ownership Breakdown
+
+#### Member 1 — Blockchain Core & Trust Layer Engineer
+* **Solidity Smart Contracts:** Authored `InstitutionRegistry.sol`, `CertificateRegistry.sol`, and `DigitalCredential.sol`.
+* **Blockchain Architecture:** Implemented the facade pattern, custom Solidity errors, and monotonic version mapping.
+* **On-Chain Security:** Engineered cross-institution isolation guards and role-based issuer whitelisting.
+* **Testing Suite:** Authored the comprehensive 33-test Hardhat test suite covering authorization, issuance, tampering, revocation, expiration, versioning, and cross-institution attacks.
+* **Deployment Automation:** Created deployment scripts (`deploy.js`, `setupDemo.js`) supporting local Hardhat and optional Ethereum Sepolia testnets.
+* **React Web Platform:** Developed the comprehensive 11-page React 19 / Vite administrative platform with interactive issuance wizard and client-side jsPDF rendering.
+
+#### Member 2 — Blockchain Application & Verification Engineer
+* **Express REST Backend:** Developed the modular REST backend (`server.js`, controllers, routes, middleware).
+* **Managed Institutional Signing:** Engineered the server-side institutional signing layer (`getInstitutionSigner`) eliminating MetaMask requirements for issuers.
+* **In-Memory Hashing Engine:** Implemented zero-disk buffer hashing (`hashService.js`) using Node.js native `crypto`.
+* **Database & Indexing:** Designed the SQLite schema (`certificates`, `verification_logs`, `blockchain_events`) and real-time event synchronizer (`eventListener.js`).
+* **Public Verification Portals:** Developed zero-auth public verifier interface (`verify.html`) and issuer management portal (`index.html`).
+* **Unified Audit & Analytics:** Built the unified audit API combining blockchain state transitions with application telemetry.
 
 ---
 
-## 12. Security Architecture
+## 9. Repository Structure
 
-### 12.1 Cross-Institution Defense (The Institution ID Binding)
-- **Vulnerability Prevented:** In a multi-tenant blockchain, an authorized issuer of *University B* might attempt to call `revokeCertificate` or `createNewVersion` on a certificate belonging to *University A*.
-- **Implementation:** In `CertificateRegistry.sol`, both `revokeCertificate` and `createNewVersion` explicitly check:
+```
+Certificate-Verification-System/
+├── .gitignore                                      # Root Git ignore rules (protects .env, DBs, node_modules)
+├── README.md                                       # Authoritative Root Documentation
+│
+├── member-1-blockchain-core/                       # Member 1: Blockchain Core & Trust Layer
+│   ├── contracts/
+│   │   ├── InstitutionRegistry.sol                 # Platform administration & issuer authorization
+│   │   ├── CertificateRegistry.sol                 # Certificate storage, verification & versioning
+│   │   └── DigitalCredential.sol                   # Unified integration facade contract
+│   ├── scripts/
+│   │   ├── deploy.js                               # Automated smart contract deployment script
+│   │   └── setupDemo.js                            # Local demo seeding script
+│   ├── test/
+│   │   ├── Authorization.test.js                   # Issuer authorization & revocation tests
+│   │   ├── CertificateRegistry.test.js             # Issuance & hash verification tests
+│   │   ├── CrossInstitutionSecurity.test.js        # Cross-institution attack regression tests
+│   │   ├── Expiration.test.js                      # Dynamic expiration tests
+│   │   ├── InstitutionIssuanceE2E.test.js          # E2E wallet issuance & PDF hash tests
+│   │   ├── InstitutionRegistry.test.js             # Institution registration & deactivation tests
+│   │   ├── Revocation.test.js                      # Certificate revocation tests
+│   │   └── Versioning.test.js                      # Certificate versioning tests
+│   ├── docs/                                       # Member 1 technical architecture guides
+│   ├── frontend/                                   # Member 1: CredChain React Platform
+│   │   ├── src/
+│   │   │   ├── pages/ (11 pages)                   # Home, Dashboard, Certificates, Analytics, etc.
+│   │   │   ├── components/                         # WalletConnect, Layout, AppShell, Common UI
+│   │   │   ├── services/blockchain.js              # Direct Ethers.js JSON-RPC integration
+│   │   │   ├── services/pdfGenerator.js            # Pure jsPDF + QR + SHA-256 generator
+│   │   │   └── contracts/                          # Contract ABIs (DigitalCredential, etc.)
+│   │   ├── index.html                              # React HTML entry point
+│   │   ├── package.json                            # React 19, Vite, Ethers.js dependencies
+│   │   └── vite.config.js                          # Vite build configuration
+│   ├── hardhat.config.js                           # Hardhat EVM compiler & network configuration
+│   ├── package.json                                # Hardhat & OpenZeppelin dependencies
+│   └── README.md                                   # Member 1 technical guide
+│
+└── member-2-blockchain-application/                # Member 2: Application & Verification Layer
+    ├── src/
+    │   ├── config/
+    │   │   ├── blockchain.js                       # Ethers.js v6 contract connectors & managed signing
+    │   │   └── database.js                         # SQLite connection & 3-table schema initialization
+    │   ├── controllers/
+    │   │   ├── analyticsController.js              # Hybrid on-chain/off-chain analytics
+    │   │   ├── auditController.js                  # Unified audit trail aggregator
+    │   │   ├── authController.js                   # JWT issuer authentication
+    │   │   └── certificateController.js            # Issuance, verification, revocation & versioning
+    │   ├── middleware/
+    │   │   └── authMiddleware.js                   # JWT header validation guard
+    │   ├── routes/
+    │   │   ├── analyticsRoutes.js                  # Analytics endpoints
+    │   │   ├── auditRoutes.js                      # Audit trail endpoints
+    │   │   ├── authRoutes.js                       # Authentication endpoints
+    │   │   └── certificateRoutes.js                # Certificate lifecycle & verification endpoints
+    │   └── services/
+    │       ├── eventListener.js                    # Real-time event listener & backfiller
+    │       └── hashService.js                      # In-memory SHA-256 buffer hashing service
+    ├── public/
+    │   ├── index.html                              # Issuer management portal
+    │   └── verify.html                             # Public zero-auth verification portal
+    ├── server.js                                   # Express server bootstrap
+    ├── test_clean_canonical_audit.js               # Forensic lifecycle & security isolation test suite
+    ├── package.json                                # Express, Ethers.js, Multer, SQLite3 dependencies
+    └── README.md                                   # Member 2 technical guide
+```
+
+---
+
+## 10. Smart Contract Architecture (Member 1)
+
+### 10.1 `InstitutionRegistry.sol`
+* **Purpose:** Acts as the decentralized identity and access registry for accredited institutions.
+* **Storage Model:**
   ```solidity
-  if (keccak256(bytes(certificates[_certificateId].institutionId)) != keccak256(bytes(_institutionId))) revert UnauthorizedIssuer();
+  struct Institution {
+      string id;          // Unique institution ID (e.g., "DEMO_INST_01")
+      string name;        // Human-readable name (e.g., "Global Tech University")
+      address wallet;     // Institution authority wallet address
+      bool isActive;      // Active status flag
+      bool exists;        // Existence check flag
+  }
   ```
-- **Result:** Even with valid signatures, an issuer from another institution is immediately reverted.
+* **Key Functions:**
+  * `registerInstitution(id, name, wallet)`: Platform admin registers an institution (`onlyOwner`).
+  * `deactivateInstitution(id)`: Platform admin suspends an institution (`onlyOwner`).
+  * `authorizeIssuer(instId, issuer)`: Institution authority wallet authorizes an operational issuer wallet.
+  * `revokeIssuer(instId, issuer)`: Institution authority wallet revokes an issuer wallet.
+  * `isAuthorizedIssuer(instId, issuer)`: Returns true if the institution is active and the issuer is authorized.
+  * `getAllInstitutionIds()`: Authoritative on-chain enumeration of registered institutions.
 
-### 12.2 Additional Security Controls
-- **`onlyFacade` Isolation:** Direct writes to `CertificateRegistry` from unauthorized addresses revert.
-- **OpenZeppelin `Ownable`:** Restricts platform-level institution registry management to the administrator.
-- **Anti-Duplication:** `issueCertificate` reverts with `CertificateAlreadyExists()` if the ID is already registered.
-- **Anti-Double-Revocation:** `revokeCertificate` reverts with `CertificateAlreadyRevoked()`.
-- **In-Memory Buffering:** Multer processes file uploads in RAM (`storage: multer.memoryStorage()`); raw files are never persisted on the server disk.
+### 10.2 `CertificateRegistry.sol`
+* **Purpose:** Stores certificate cryptographic proofs, enforces lifecycle transitions, and executes verification.
+* **Storage Model:**
+  ```solidity
+  struct Certificate {
+      string certificateId;      // Unique credential ID (e.g., "CERT-2026-001")
+      string certificateHash;    // 0x-prefixed 64-char SHA-256 hex digest
+      address issuer;            // Authorized issuer wallet that submitted the transaction
+      uint256 issueTimestamp;    // Block timestamp of issuance/update
+      uint256 expiryTimestamp;   // Expiration timestamp (0 = no expiry)
+      CertificateStatus status;  // ACTIVE (0) or REVOKED (1)
+      uint256 version;           // Monotonic version counter (starts at 1)
+      bool exists;               // Existence flag
+      string institutionId;      // Issuing institution binding for access control
+  }
+  ```
+* **Key Functions:**
+  * `issueCertificate(...)`: Records a new credential (`onlyFacade`). Reverts if ID already exists.
+  * `verifyCertificate(id, hash)`: Evaluates `exists`, hash match (`TAMPERED`), `status` (`REVOKED`), and `expiryTimestamp` (`EXPIRED`). Returns `VALID` if all pass.
+  * `revokeCertificate(...)`: Marks credential as `REVOKED`. Validates caller authority and institution ID binding.
+  * `createNewVersion(...)`: Updates document hash, increments version counter, and stores version snapshot in `certificateVersions[id][version]`.
+
+### 10.3 `DigitalCredential.sol` (Facade Pattern)
+* **Purpose:** Provides a unified, single-contract integration interface for the Express backend and React frontend.
+* **Integration:** Forwards requests to `CertificateRegistry` while passing `msg.sender` as caller context for on-chain authorization validation.
 
 ---
 
-## 13. Authentication & Authorization
+## 11. On-Chain vs Off-Chain Data Architecture
 
-| Category | Authentication Layer (Member 2) | Blockchain Authorization (Member 1) | Public Verifier Access |
-| :--- | :--- | :--- | :--- |
-| **Technology** | JSON Web Token (JWT) | Ethereum ECDSA Wallet Signatures | None (Anonymous Open Access) |
-| **Validation Point** | Express `authMiddleware.js` | Smart Contract `isAuthorizedIssuer()` | Open HTTP Route |
-| **Token Validity** | 24 Hours (`expiresIn: '24h'`) | Per-Transaction Nonce/Signature | Instant Request |
-| **Target Operations** | `issue`, `revoke`, `version`, `audit` | On-chain state mutations | `verify`, `getCertificateInfo` |
+CredChain rigorously separates data across storage domains:
 
----
-
-## 14. REST API Reference
-
-| Method | Endpoint | Auth Required | Request Payload | Response Output |
-| :--- | :--- | :---: | :--- | :--- |
-| `POST` | `/api/auth/login` | **No** | JSON: `{ "username": "...", "password": "...", "institutionId": "..." }` | `{ "message": "...", "token": "...", "expiresIn": "24h", "user": {...} }` |
-| `POST` | `/api/certificates/issue` | **YES (JWT)** | Multipart: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` | `{ "message": "...", "certificateId": "...", "hash": "...", "qrCode": "...", "verifyUrl": "..." }` |
-| `POST` | `/api/certificates/verify` | **No** | Multipart: `certificateId`, `pdf` (file) | `{ "certificateId": "...", "status": "VALID\|TAMPERED\|REVOKED\|EXPIRED\|NOT_FOUND", "version": 1 }` |
-| `POST` | `/api/certificates/revoke` | **YES (JWT)** | JSON: `{ "institutionId": "...", "certificateId": "..." }` | `{ "message": "Certificate revoked successfully", "certificateId": "..." }` |
-| `POST` | `/api/certificates/version` | **YES (JWT)** | Multipart: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` | `{ "message": "Certificate version created successfully", "certificateId": "...", "newHash": "...", "version": 2 }` |
-| `GET` | `/api/certificates/:id` | **No** | URL Parameter: `id` | `{ "id": "...", "studentName": "...", "courseName": "...", "issueDate": "...", "status": "..." }` |
-| `GET` | `/api/certificates/:id/audit` | **YES (JWT)** | URL Parameter: `id` | `{ "count": N, "logs": [ { "id": 1, "certificateId": "...", "timestamp": "...", "status": "...", "ipAddress": "...", "userAgent": "..." } ] }` |
-| `GET` | `/api/certificates/audit/all` | **YES (JWT)** | None | `{ "count": N, "logs": [...] }` |
+| Data Field | Storage Domain | Technology | Source of Truth | Rationale |
+| :--- | :--- | :--- | :--- | :--- |
+| **Certificate ID** | On-Chain & Off-Chain | EVM Storage & SQLite | **Blockchain** | Primary key for cryptographic lookups. |
+| **Document SHA-256 Hash** | On-Chain Only | EVM Storage (`string`) | **Blockchain** | Immutable cryptographic anchor of the PDF. |
+| **Issuer Wallet Address** | On-Chain Only | EVM Storage (`address`) | **Blockchain** | Proves which authorized wallet signed the credential. |
+| **Institution ID Binding** | On-Chain & Off-Chain | EVM Storage & SQLite | **Blockchain** | Enforces cross-institution security boundaries. |
+| **Status (ACTIVE / REVOKED)** | On-Chain & Off-Chain | EVM Storage & SQLite | **Blockchain** | Immutable lifecycle status. |
+| **Version Number** | On-Chain Only | EVM Storage (`uint256`) | **Blockchain** | Monotonic version sequence. |
+| **Expiration Timestamp** | On-Chain Only | EVM Storage (`uint256`) | **Blockchain** | Evaluated dynamically against `block.timestamp`. |
+| **Student Full Name** | Off-Chain Only | SQLite (`studentName`) | **SQLite** | **PII Protection:** Prevents privacy violations (GDPR/FERPA). |
+| **Course / Program Title** | Off-Chain Only | SQLite (`courseName`) | **SQLite** | Application indexing and human presentation. |
+| **Raw Certificate PDF** | Volatile RAM Only | Node.js Buffer / jsPDF | **Student File** | **Gas Optimization:** Raw PDFs are never stored on-chain or on disk. |
+| **Verification Telemetry** | Off-Chain Only | SQLite (`verification_logs`) | **SQLite** | Audit logs (IP, User-Agent, Outcome) for telemetry. |
+| **Blockchain Event Cache** | Off-Chain Only | SQLite (`blockchain_events`) | **Blockchain (Mirrored)** | Indexed cache of historical smart contract events. |
 
 ---
 
-## 15. Database Architecture
+## 12. Certificate Hashing & Integrity Verification
 
-SQLite schema (`database.sqlite`):
+CredChain uses **SHA-256** (Secure Hash Algorithm 256-bit) to establish cryptographic proofs:
+
+1. **Deterministic Hashing:** Any change to a PDF—even a single whitespace or metadata byte—produces a completely different 256-bit hash (avalanche effect).
+2. **Standard Hex Formatting:** Hashes are represented as `0x`-prefixed 64-character lowercase hexadecimal strings (e.g., `0x3a4b...8f9e`).
+3. **Dual Hashing Implementation:**
+   * **Backend (`hashService.js`):** Uses Node.js native `crypto.createHash('sha256').update(buffer).digest('hex')`.
+   * **Frontend (`pdfGenerator.js`):** Uses browser Web Crypto API `crypto.subtle.digest('SHA-256', arrayBuffer)`.
+4. **On-Chain Evaluation:** The smart contract compares strings using `keccak256(bytes(cert.certificateHash)) != keccak256(bytes(_certificateHash))`.
+
+---
+
+## 13. Issuance Flow
+
+```
+1. Administrator logs into Issuer Portal / React Platform (receives JWT).
+2. Enters metadata: Certificate ID, Student Name, Course, Expiration (optional).
+3. Uploads or generates candidate PDF.
+4. System computes SHA-256 hash in memory.
+5. Backend invokes `getInstitutionSigner(institutionId)` to retrieve the institution's authorized wallet.
+6. Backend dispatches `DigitalCredential.issueCertificate(institutionId, certId, hash, expiry)` transaction to the blockchain.
+7. Smart contract validates caller authorization and writes record to EVM storage.
+8. Backend records student metadata and transaction hash in SQLite.
+9. System generates verification QR code and delivers the finalized PDF to the graduate.
+```
+
+---
+
+## 14. Verification Flow
+
+```
+1. Public Verifier opens `/verify.html` (or React Public Verification page).
+2. Verifier uploads candidate certificate PDF (and optional Certificate ID).
+3. Backend scans PDF stream to auto-detect embedded Certificate ID (or accepts manual ID).
+4. Backend computes SHA-256 hash from the uploaded PDF buffer in RAM.
+5. Backend performs read-only JSON-RPC call: `DigitalCredential.verifyCertificate(certId, hash)`.
+6. Smart contract evaluates existence, hash matching, revocation, and expiration.
+7. Backend records verification attempt (IP, timestamp, user agent, outcome) in `verification_logs`.
+8. Verifier receives deterministic status: VALID (with version), TAMPERED, REVOKED, EXPIRED, or NOT_FOUND.
+```
+
+---
+
+## 15. QR Code Verification
+
+* **QR Code Payload:** Contains strictly a clean public verification URL:
+  ```
+  http://<host>:<port>/verify.html?id=<certificateId>
+  ```
+* **Privacy & Security Guarantees:**
+  * **Zero PII:** Does NOT contain student names, grades, or personal details.
+  * **Zero Secrets:** Does NOT contain JWT tokens, private keys, or API credentials.
+  * **Zero Binary Bloat:** Does NOT contain raw PDF binaries.
+* **Verification Workflow:** Scanning the QR code auto-fills the Certificate ID on the verification portal. The verifier then uploads the physical/digital PDF document to execute the cryptographic proof check.
+
+---
+
+## 16. Revocation, Expiration & Versioning
+
+### Revocation
+* **Execution:** `DigitalCredential.revokeCertificate(institutionId, certificateId)`.
+* **Access Rule:** Only an authorized issuer of the issuing institution or the institution authority wallet can revoke.
+* **Effect:** State is permanently set to `CertificateStatus.REVOKED`. The certificate can never return to `VALID`.
+
+### Expiration
+* **Execution:** Dynamically evaluated on-chain during verification.
+* **Logic:** If `expiryTimestamp > 0 && block.timestamp > expiryTimestamp`, the smart contract returns `EXPIRED`.
+
+### Versioning
+* **Execution:** `DigitalCredential.createNewVersion(institutionId, certId, newHash, newExpiry)`.
+* **Logic:** Increments `version` counter (e.g., v1 ➔ v2), updates active document hash, and archives past version data in `certificateVersions[id][version]`.
+* **Verification Behavior:** Verifying the updated PDF returns `VALID` (Version 2); verifying the older PDF returns `TAMPERED`.
+
+---
+
+## 17. Institution & Issuer Authorization Model
+
+CredChain enforces a two-tier role-based access control (RBAC) hierarchy on-chain:
+
+```
+Platform Administrator (Deployer / Ownable)
+        │
+        ▼ (registerInstitution / deactivateInstitution)
+Institution Authority Wallet (e.g., Global Tech University)
+        │
+        ▼ (authorizeIssuer / revokeIssuer)
+Operational Issuer Wallets (e.g., Department Registrar)
+        │
+        ▼ (issueCertificate / revokeCertificate / createNewVersion)
+On-Chain Certificate Lifecycle
+```
+
+---
+
+## 18. Managed Institutional Blockchain Signing
+
+CredChain eliminates the standard Web3 user friction (MetaMask popups, gas fee funding, private key management) for university administrators through **Managed Institutional Signing**:
+
+1. **Identity Mapping:** The backend maintains secure mapping between registered institution IDs and their authorized private keys (`DEV_INSTITUTION_KEYS` / environment configuration).
+2. **Transaction Execution:** When an authenticated issuer requests issuance, the backend signs the transaction using that institution's specific on-chain wallet (`getInstitutionSigner(institutionId)`).
+3. **On-Chain Verification:** The smart contract sees `msg.sender` as the institution's authorized wallet address and validates permissions.
+4. **Enterprise Custody Compatibility:** In production, `getInstitutionSigner` can be seamlessly replaced with cloud Key Management Services (AWS KMS, GCP KMS, Azure Key Vault) or Multi-Party Computation (MPC) custody without altering smart contract logic.
+
+---
+
+## 19. Backend Architecture (Member 2)
+
+The backend (`member-2-blockchain-application/`) is structured as a production-grade Express.js application:
+
+* **`server.js`:** Application entry point initializing SQLite, connecting to blockchain, starting event synchronizer, and mounting routes.
+* **`src/config/blockchain.js`:** Connects Ethers.js v6 JSON-RPC provider, loads ABIs, initializes contract instances, and manages institutional signing keys.
+* **`src/config/database.js`:** Manages SQLite database connection and initializes tables (`certificates`, `verification_logs`, `blockchain_events`).
+* **`src/controllers/`:**
+  * `certificateController.js`: Handles issuance, verification, revocation, versioning, and auto-detection of certificate IDs.
+  * `auditController.js`: Unified audit aggregator merging on-chain events and verification telemetry.
+  * `analyticsController.js`: Computes summary metrics, issuance/verification trends, and institution breakdowns.
+  * `authController.js`: JWT login and authentication.
+* **`src/middleware/authMiddleware.js`:** Enforces JWT bearer token validation on protected administrative routes.
+* **`src/services/`:**
+  * `hashService.js`: Zero-disk SHA-256 buffer computation.
+  * `eventListener.js`: Real-time on-chain event listener and historical log backfiller.
+
+---
+
+## 20. Frontend Platforms (Member 1 & Member 2)
+
+CredChain provides two complementary frontend interfaces:
+
+### 20.1 Member 1: CredChain React Platform (`member-1-blockchain-core/frontend/`)
+* **Technology:** React 19, Vite `^6.1.0`, Ethers.js v6, jsPDF, Lucide Icons, Vanilla CSS design system.
+* **Portals & Pages:**
+  1. `Home.jsx`: Public landing page with system feature highlights.
+  2. `Dashboard.jsx`: Real-time metrics, quick actions, and recent activity streams.
+  3. `Certificates.jsx`: Credential catalog with interactive issuance modal wizard.
+  4. `Institutions.jsx`: On-chain institution directory and registration interface.
+  5. `Issuers.jsx`: Authorized issuer management and wallet authorization interface.
+  6. `Verification.jsx`: Administrative verification playground.
+  7. `PublicVerification.jsx`: Public drag-and-drop PDF verification interface.
+  8. `CredentialDetails.jsx`: Comprehensive credential lifecycle details, hash display, and version history.
+  9. `BlockchainActivityPage.jsx`: Live blockchain event feed with block numbers and transaction hashes.
+  10. `Analytics.jsx`: Visual charts for issuance trends, verification outcomes, and institution metrics.
+  11. `Settings.jsx`: Network configuration and RPC endpoint inspector.
+* **Client-Side PDF Generator (`pdfGenerator.js`):** Programmatically generates A4 landscape certificate PDFs, embeds verification QR codes, and computes deterministic SHA-256 digests via browser Web Crypto.
+
+### 20.2 Member 2: Public Verifier & Issuer Portals (`member-2-blockchain-application/public/`)
+* **Technology:** Vanilla HTML5, Modern CSS, JavaScript.
+* **Portals:**
+  * `verify.html`: Lightweight, zero-authentication public verification portal for employers and verifiers.
+  * `index.html`: Administrative issuer portal with JWT login for issuance and revocation.
+
+---
+
+## 21. Database Schema & Event Indexer
+
+SQLite database (`database.sqlite`) maintains three relational tables:
 
 ```sql
--- Certificate metadata table
+-- 1. Certificate metadata table (Off-chain presentation cache)
 CREATE TABLE IF NOT EXISTS certificates (
     id TEXT PRIMARY KEY,
     studentName TEXT,
@@ -387,7 +596,7 @@ CREATE TABLE IF NOT EXISTS certificates (
     status TEXT
 );
 
--- Public verification telemetry log table
+-- 2. Public verification telemetry table
 CREATE TABLE IF NOT EXISTS verification_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     certificateId TEXT,
@@ -396,176 +605,197 @@ CREATE TABLE IF NOT EXISTS verification_logs (
     ipAddress TEXT,
     userAgent TEXT
 );
+
+-- 3. Synchronized blockchain events table
+CREATE TABLE IF NOT EXISTS blockchain_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    eventType TEXT NOT NULL,
+    certificateId TEXT,
+    institutionId TEXT,
+    issuer TEXT,
+    timestamp TEXT NOT NULL,
+    blockNumber INTEGER NOT NULL,
+    transactionHash TEXT NOT NULL,
+    logIndex INTEGER NOT NULL,
+    version INTEGER,
+    UNIQUE(transactionHash, logIndex)
+);
 ```
 
 ---
 
-## 16. Repository Structure
+## 22. Unified Audit Trail & Telemetry
 
-```text
-Certificate-Verification-System/
-├── .gitignore                                      # Root Git ignore rules
-├── README.md                                       # Complete Project Documentation (v1.0.0)
-│
-├── member-1-blockchain-core/                       # Member 1: Smart Contracts & Trust Layer
-│   ├── contracts/
-│   │   ├── InstitutionRegistry.sol                 # Institution & issuer authority registry
-│   │   ├── CertificateRegistry.sol                 # Certificate hashes, lifecycle & versioning
-│   │   └── DigitalCredential.sol                   # Unified integration facade contract
-│   ├── scripts/
-│   │   ├── deploy.js                               # Hardhat contract deployment script
-│   │   └── setupDemo.js                            # Demo institution/issuer setup script
-│   ├── test/
-│   │   ├── Authorization.test.js                   # Issuer authorization tests
-│   │   ├── CertificateRegistry.test.js             # Issuance & hash verification tests
-│   │   ├── CrossInstitutionSecurity.test.js        # Cross-institution attack regression tests
-│   │   ├── Expiration.test.js                      # Certificate expiration tests
-│   │   ├── InstitutionRegistry.test.js             # Institution registration tests
-│   │   ├── Revocation.test.js                      # Revocation lifecycle tests
-│   │   └── Versioning.test.js                      # Version history tests
-│   ├── hardhat.config.js                           # Hardhat EVM compiler configuration
-│   ├── package.json                                # Hardhat & OpenZeppelin dependencies
-│   ├── README.md                                   # Member 1 Core technical guide
-│   └── frontend/                                   # Member 1: CredChain React Platform
-│       ├── src/
-│       │   ├── App.jsx, main.jsx, App.css          # React application root
-│       │   ├── pages/ (11 pages)                   # Dashboard, Verification, Analytics, etc.
-│       │   ├── components/                         # WalletConnect, Layout, UI Components
-│       │   ├── services/blockchain.js              # Direct frontend Ethers.js integration
-│       │   └── contracts/                          # Contract ABIs
-│       ├── index.html                              # React HTML entry
-│       ├── package.json                            # React 18 & Vite dependencies
-│       └── vite.config.js                          # Vite build tool configuration
-│
-└── member-2-blockchain-application/                # Member 2: Backend & Public Application Layer
-    ├── src/
-    │   ├── config/
-    │   │   ├── blockchain.js                       # Ethers.js v6 contract connectors
-    │   │   └── database.js                         # SQLite connection & table initialization
-    │   ├── controllers/
-    │   │   ├── authController.js                   # JWT login and token generation
-    │   │   └── certificateController.js            # Issuance, verification, revoke & audit
-    │   ├── middleware/
-    │   │   └── authMiddleware.js                   # JWT header validation guard
-    │   ├── routes/
-    │   │   ├── authRoutes.js                       # Authentication route definitions
-    │   │   └── certificateRoutes.js                # Certificate & verification API routes
-    │   └── services/
-    │       ├── eventListener.js                    # Real-time blockchain event synchronizer
-    │       └── hashService.js                      # In-memory SHA-256 computation service
-    ├── public/
-    │   ├── index.html                              # Issuer management portal (JWT authenticated)
-    │   └── verify.html                             # Public verification portal (Zero auth)
-    ├── server.js                                   # Express server bootstrap & port listener
-    ├── package.json                                # Express, Ethers.js, Multer, SQLite dependencies
-    └── README.md                                   # Member 2 Application technical guide
-```
+CredChain implements a **Unified Audit Trail** (`GET /api/audit/events`) that combines two fundamentally different classes of audit data without conflating them:
+
+1. **State-Changing Blockchain Events (`Source: Blockchain`):**
+   * Types: `CertificateIssued`, `CertificateRevoked`, `CertificateVersionCreated`, `InstitutionRegistered`, `IssuerAuthorized`.
+   * Attributes: Block number, transaction hash, log index, emitting wallet address.
+2. **Non-State-Changing Verification Telemetry (`Source: Application Verification Log`):**
+   * Type: `Credential Verified`.
+   * Attributes: Client IP address, user agent, timestamp, verification outcome (`VALID`, `TAMPERED`, etc.).
+   * **Integrity Guarantee:** Verification logs are explicitly marked as application read operations and are **NEVER fabricated as fake blockchain transactions**.
 
 ---
 
-## 17. Member Responsibilities
+## 23. Analytics Engine
 
-### Member 1 — Blockchain Core & Trust Layer Engineer
-- Designed and authored Solidity smart contracts (`InstitutionRegistry.sol`, `CertificateRegistry.sol`, `DigitalCredential.sol`).
-- Configured the Hardhat local Ethereum node development environment.
-- Implemented the facade pattern and `onlyFacade` access controls.
-- Authored the comprehensive Hardhat unit and security regression test suite (31 tests).
-- Engineered the cross-institution smart contract security boundary.
-- Developed the Member 1 CredChain React 18 / Vite administrative platform.
+The Analytics API (`/api/analytics`) delivers comprehensive system metrics:
 
-### Member 2 — Blockchain Application & Verification Engineer
-- Developed the Express.js REST application layer and API controllers.
-- Integrated the backend with smart contracts using Ethers.js v6.
-- Implemented the in-memory SHA-256 buffer hashing service (`hashService.js`).
-- Designed the SQLite database schema (`certificates` and `verification_logs`).
-- Implemented the real-time blockchain event synchronization service (`eventListener.js`).
-- Engineered the JWT authentication flow and route protection middleware.
-- Built the QR code generation engine and public verification portal (`verify.html`).
-- Built the issuer management interface (`index.html`).
+* **`/api/analytics/summary`:** Computes active credentials, revoked credentials, expired credentials, total registered institutions, authorized issuers, total verification attempts, and tampered detection counts.
+* **`/api/analytics/issuance-trends`:** Daily credential issuance volume over time.
+* **`/api/analytics/verification-trends`:** Daily verification volume over time.
+* **`/api/analytics/verification-results`:** Breakdown of verification outcomes (`VALID`, `TAMPERED`, `REVOKED`, `EXPIRED`, `NOT_FOUND`).
+* **`/api/analytics/institutions`:** Credential distribution across registered institutions.
+* **`/api/analytics/recent-activity`:** Latest issuances, revocations, and verification queries.
 
 ---
 
-## 18. Technology Stack
+## 24. REST API Reference
 
-| Layer | Technology | Version | Purpose |
-| :--- | :--- | :--- | :--- |
-| **Smart Contracts** | Solidity | `^0.8.20` | Core smart contract business logic |
-| **Development Network** | Hardhat | `^2.22.0` | EVM compiler, testing runtime, and local RPC node |
-| **Contract Security** | OpenZeppelin | `^5.0.0` | Standard `Ownable` contract library |
-| **Blockchain Client** | Ethers.js | `v6.17.0` | JSON-RPC provider, contract bindings, wallet transactions |
-| **Backend Runtime** | Node.js (ESM) | `v18+` | Server execution environment |
-| **Web Framework** | Express.js | `^4.19.2` | RESTful API server |
-| **File Processing** | Multer | `^1.4.5-lts.1`| In-memory multipart buffer extraction |
-| **Database** | SQLite3 | `^5.1.7` | Off-chain certificate metadata and audit logging |
-| **Authentication** | JSON Web Tokens | `^9.0.2` | Stateless HTTP authorization tokens |
-| **QR Engine** | QRCode | `^1.5.3` | QR code Base64 Data URL generation |
-| **Frontend 1 (Admin)** | React / Vite | `^19.2.8` / `^6.1.0` | Member 1 administrative dashboard |
-| **Frontend 2 (Public)** | HTML5 / CSS3 / JS | Vanilla | Member 2 issuer and public verifier portals |
-| **Cryptography** | Node `crypto` | Native | SHA-256 cryptographic document digest computation |
-| **Testing** | Mocha / Chai | Native Hardhat | Automated contract test runners and assertions |
+### 24.1 Authentication
+| Method | Endpoint | Auth | Request Body | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `POST` | `/api/auth/login` | No | `{ "username": "admin", "password": "..." }` | Authenticates administrator and returns signed JWT token (24h expiry). |
+
+### 24.2 Certificate Lifecycle & Verification
+| Method | Endpoint | Auth | Request Payload | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `POST` | `/api/certificates/issue` | **JWT** | Multipart: `institutionId`, `certificateId`, `studentName`, `courseName`, `pdf` (file), `expiryTimestamp` (optional) | Signs on-chain issuance transaction, saves off-chain metadata, returns receipt & QR. |
+| `POST` | `/api/certificates/verify` | **No** | Multipart: `pdf` (file, required), `certificateId` (optional) | Auto-detects certificate ID, computes SHA-256 hash, queries smart contract, logs telemetry. |
+| `POST` | `/api/certificates/revoke` | **JWT** | JSON: `{ "institutionId": "...", "certificateId": "..." }` | Signs and submits on-chain revocation transaction via institution wallet. |
+| `POST` | `/api/certificates/version` | **JWT** | Multipart: `institutionId`, `certificateId`, `pdf` (file), `newExpiryTimestamp` (optional) | Signs new version transaction on-chain, increments version counter. |
+| `GET` | `/api/certificates` | No | None | Returns list of all cached certificates. |
+| `GET` | `/api/certificates/:id` | No | URL Parameter: `id` | Retrieves off-chain metadata for a single certificate. |
+| `GET` | `/api/certificates/:id/audit` | **JWT** | URL Parameter: `id` | Retrieves verification telemetry logs for a specific certificate. |
+
+### 24.3 Audit & Analytics
+| Method | Endpoint | Auth | Query Parameters | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `GET` | `/api/audit/events` | **JWT** | `page`, `limit`, `eventType`, `source` (`ALL`, `blockchain`, `application`), `search` | Paginated unified audit trail aggregating blockchain events and verification logs. |
+| `GET` | `/api/analytics/summary` | No | None | Summary dashboard metrics. |
+| `GET` | `/api/analytics/issuance-trends` | No | None | Historical daily issuance trend data. |
+| `GET` | `/api/analytics/verification-trends` | No | None | Historical daily verification trend data. |
+| `GET` | `/api/analytics/verification-results` | No | None | Categorical breakdown of verification outcomes. |
+| `GET` | `/api/analytics/institutions` | No | None | Breakdown of issued credentials by institution. |
+| `GET` | `/api/analytics/recent-activity` | No | None | Recent activity feed for dashboard streams. |
 
 ---
 
-## 19. Installation & Setup
+## 25. Security Threat Model & Defenses
 
-### 19.1 Prerequisites
-- **Node.js** (v18.0.0 or higher recommended)
-- **npm** (v9.0.0 or higher)
-- **Git**
+| Threat Vector | Potential Impact | CredChain Defense Mechanism |
+| :--- | :--- | :--- |
+| **PDF Document Modification** | Student alters grades, degree, or name on PDF. | **SHA-256 Hash Mismatch:** Any altered byte generates a completely different hash. Smart contract returns `TAMPERED`. |
+| **Unauthorized Issuance** | Attacker calls smart contract to issue fake degree. | **On-Chain RBAC:** `isAuthorizedIssuer(institutionId, msg.sender)` check reverts unauthorized callers with `UnauthorizedIssuer()`. |
+| **Cross-Institution Attack** | University B attempts to revoke University A's certificate. | **Institution ID Binding:** `CertificateRegistry` strictly checks `certificates[id].institutionId == callerInstitutionId`. |
+| **Database Compromise** | Attacker gains SQL access and alters SQLite table. | **Blockchain Authority:** Verification queries the smart contract directly. Database modifications cannot forge a valid on-chain verification. |
+| **Double Revocation** | Re-revoking an already revoked credential. | **State Guard:** Smart contract checks `status == CertificateStatus.REVOKED` and reverts with `CertificateAlreadyRevoked()`. |
+| **Private Key Leakage** | Compromise of institutional private keys. | **Server-Side Key Isolation:** Private keys are kept strictly on the backend; never exposed to frontend JavaScript or client bundles. |
+| **PII Exposure via QR** | Public verifiers or eavesdroppers intercept student data. | **Zero-PII QR:** QR codes encode only a public URL. Personal details are never embedded in the QR image. |
 
-### 19.2 Step 1: Clone Repository
+---
+
+## 26. Network Configuration (Hardhat & Sepolia)
+
+CredChain supports dual-network EVM environments:
+
+| Network | Chain ID | RPC Endpoint | Deployment Status | Purpose |
+| :--- | :---: | :--- | :--- | :--- |
+| **Hardhat Localhost** | `31337` | `http://127.0.0.1:8545` | **Active / Primary** | Local development, rapid testing, and end-to-end runtime validation. |
+| **Ethereum Sepolia** | `11155111` | Configurable via `.env` | **Configured** | Optional public testnet deployment. *(Configured in hardhat.config.js; no live deployment claimed).* |
+
+---
+
+## 27. Canonical Institutions & Test Fixture Model
+
+To ensure strict consistency between the blockchain and user interfaces, CredChain defines an explicit institution model:
+
+### Canonical Application Institutions (Clean Baseline)
+On normal startup, the backend automatically registers exactly **three canonical institutions** on-chain:
+1. `DEMO_INST_01` — Global Tech University (Authority: Account #1 `0x7099...79C8`)
+2. `UNIV01` — State University (Authority: Account #1 `0x7099...79C8`)
+3. `INST-001` — Institute One (Authority: Account #1 `0x7099...79C8`)
+
+### Security Test Fixture (`INST-002`)
+* `INST-002` (Polytechnic Institute, Account #2 `0x3C44...93BC`) is a **development/security-isolation fixture**.
+* It is **NOT** automatically registered on clean baseline startup.
+* It is dynamically created during automated security tests (`test_clean_canonical_audit.js` / `CrossInstitutionSecurity.test.js`) to verify that cross-institution attacks are blocked on-chain.
+
+---
+
+## 28. Installation & Setup
+
+### 28.1 Prerequisites
+* **Node.js** (v18.0.0 or higher)
+* **npm** (v9.0.0 or higher)
+* **Git**
+
+### 28.2 Step 1: Clone Repository
 ```bash
 git clone https://github.com/aryankumarjha2006-oss/Certificate-Verification-System.git
 cd Certificate-Verification-System
 ```
 
-### 19.3 Step 2: Install Member 1 Dependencies
+### 28.3 Step 2: Install Member 1 Dependencies
 ```bash
 cd member-1-blockchain-core
 npm install
 ```
 
-### 19.4 Step 3: Start Hardhat Local Blockchain
-In your first terminal:
+### 28.4 Step 3: Launch Local Hardhat Blockchain Node
+In Terminal 1:
 ```bash
 cd member-1-blockchain-core
 npx hardhat node
 ```
-*Hardhat node will start at `http://127.0.0.1:8545` (Chain ID: 31337).*
+*The local node starts at `http://127.0.0.1:8545` (Chain ID: 31337).*
 
-### 19.5 Step 4: Deploy Smart Contracts
-
-#### Option A: Deploy to Local Hardhat Node (Default)
-In a second terminal:
+### 28.5 Step 4: Deploy Smart Contracts
+In Terminal 2:
 ```bash
 cd member-1-blockchain-core
 npx hardhat run scripts/deploy.js --network localhost
 ```
-*Take note of the deployed contract addresses. By default on a clean node, they deploy to:*
-- `InstitutionRegistry`: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
-- `CertificateRegistry`: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
-- `DigitalCredential`: `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0`
+*Default deployed contract addresses on a clean node:*
+* `InstitutionRegistry`: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+* `CertificateRegistry`: `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`
+* `DigitalCredential`: `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0`
 
-*(Optional) Seed demo institution & issuer:*
-```bash
-npx hardhat run scripts/setupDemo.js --network localhost
-```
-
-#### Option B: Deploy to Ethereum Sepolia Testnet (Optional)
-1. Configure `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY` in `member-1-blockchain-core/.env`.
-2. Ensure the deployer account has test ETH.
-3. Deploy:
-```bash
-npx hardhat run scripts/deploy.js --network sepolia
-```
-
-### 19.6 Step 5: Install Member 2 Dependencies & Configure Environment
-In a third terminal:
+### 28.6 Step 5: Install Member 2 Dependencies & Configure Environment
+In Terminal 3:
 ```bash
 cd ../member-2-blockchain-application
 npm install
 ```
-Verify or create `member-2-blockchain-application/.env`:
+Ensure `member-2-blockchain-application/.env` exists (see [Environment Variables](#29-environment-variables)).
+
+### 28.7 Step 6: Start Member 2 Backend Application
+```bash
+cd member-2-blockchain-application
+node server.js
+```
+*The Express server will start on `http://localhost:3000`, connect to the blockchain, and bootstrap the canonical institutions.*
+
+### 28.8 Step 7: (Optional) Launch Member 1 React Platform
+In Terminal 4:
+```bash
+cd member-1-blockchain-core/frontend
+npm install
+npm run dev
+```
+*The React application will start on `http://localhost:5173`.*
+
+### 28.9 Step 8: Access Application Portals
+* **Member 1 React Platform:** `http://localhost:5173`
+* **Member 2 Issuer Portal:** `http://localhost:3000/index.html`
+* **Member 2 Public Verifier Portal:** `http://localhost:3000/verify.html`
+
+---
+
+## 29. Environment Variables
+
+### Member 2 Backend (`member-2-blockchain-application/.env`)
 ```env
 PORT=3000
 RPC_URL=http://127.0.0.1:8545
@@ -578,175 +808,195 @@ ISSUER_USERNAME=admin
 ISSUER_PASSWORD=admin123
 ```
 
-### 19.7 Step 6: Start Member 2 Backend Application
-```bash
-cd member-2-blockchain-application
-node server.js
-```
-*The server will start on `http://localhost:3000` and automatically connect to Hardhat and SQLite.*
-
-### 19.8 Step 7: (Optional) Run Member 1 React Frontend
-```bash
-cd ../member-1-blockchain-core/frontend
-npm install
-npm run dev
+### Member 1 Core / Sepolia (`member-1-blockchain-core/.env.example`)
+```env
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/YOUR_API_KEY
+SEPOLIA_PRIVATE_KEY=your_private_key_here
 ```
 
-### 19.9 Step 8: Access the Application Portals
-- **Member 2 Issuer Portal:** `http://localhost:3000/index.html`
-- **Member 2 Public Verifier Portal:** `http://localhost:3000/verify.html`
-- **Member 1 React Platform:** `http://localhost:5173/`
+### Member 1 Frontend (`member-1-blockchain-core/frontend/.env.example`)
+```env
+VITE_INSTITUTION_REGISTRY_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
+VITE_DIGITAL_CREDENTIAL_ADDRESS=0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0
+VITE_API_BASE_URL=http://localhost:3000
+```
 
 ---
 
-## 20. Environment Variables
+## 30. Testing & Validation
 
-| Variable | Description | Default (Local Dev) | Sepolia / Production |
-| :--- | :--- | :--- | :--- |
-| `PORT` | Express server HTTP port | `3000` | `3000` |
-| `RPC_URL` | EVM JSON-RPC provider endpoint | `http://127.0.0.1:8545` | `https://eth-sepolia.g.alchemy.com/v2/...` |
-| `PRIVATE_KEY` | Deployer / Default Account private key | Hardhat Account #0 | Server-side secure private key |
-| `SEPOLIA_RPC_URL` | Hardhat config Sepolia endpoint | `https://rpc.sepolia.org` | Configured via `.env` |
-| `SEPOLIA_PRIVATE_KEY` | Hardhat config Sepolia deployer key | None | Configured via `.env` (Never committed) |
-| `INSTITUTION_REGISTRY_ADDRESS` | Deployed `InstitutionRegistry` address | Local deployed address | Sepolia deployed address |
-| `CERTIFICATE_REGISTRY_ADDRESS` | Deployed `CertificateRegistry` address | Local deployed address | Sepolia deployed address |
-| `DIGITAL_CREDENTIAL_ADDRESS` | Deployed `DigitalCredential` facade address | Local deployed address | Sepolia deployed address |
-| `JWT_SECRET` | Secret key for signing and verifying JWTs | `supersecretjwtkey123` | High-entropy production secret |
-| `ISSUER_USERNAME` | Demo administrative issuer login username | `admin` | Production admin username |
-| `ISSUER_PASSWORD` | Demo administrative issuer login password | `admin123` | Production admin password |
-
----
-
-## 21. Testing & Validation
-
-Run the full smart contract test suite from `member-1-blockchain-core`:
-
+### 30.1 Smart Contract Test Suite (33 Tests)
+Run the automated Hardhat test suite:
 ```bash
 cd member-1-blockchain-core
 npx hardhat test
 ```
 
-### Confirmed Results: **31 Passing Tests (2s)**
-- **`Authorization.test.js` (5 tests):** Issuer authorization, revocation, and inactive institution rejection.
-- **`CertificateRegistry.test.js` (7 tests):** Issuance, duplicate rejection, tamper detection, and input validation.
-- **`CrossInstitutionSecurity.test.js` (3 tests):** Unauthorized cross-institution revocation and versioning rejection.
-- **`Expiration.test.js` (2 tests):** Valid non-expired vs expired certificates.
-- **`InstitutionRegistry.test.js` (8 tests):** Registration, duplicate ID prevention, deactivation, and permissions.
-- **`Revocation.test.js` (4 tests):** Revocation execution, authority overrides, and double-revocation guards.
-- **`Versioning.test.js` (2 tests):** Monotonic version increments and unauthorized version creation rejection.
+```
+  Authorization
+    ✓ Should authorize an issuer
+    ✓ Should revoke an issuer
+    ✓ Should reject unauthorized issuer management
+    ✓ Should reject authorization if institution is inactive
+    ✓ isAuthorizedIssuer should return false if institution is inactive
+
+  CertificateRegistry & DigitalCredential Issuance
+    Issuance
+      ✓ Should issue a certificate successfully
+      ✓ Should reject duplicate certificate
+      ✓ Should reject empty hash or ID
+      ✓ Should reject issuance from unauthorized user
+    Retrieval and Verification
+      ✓ Should return correct status for valid certificate
+      ✓ Should return TAMPERED for wrong hash
+      ✓ Should return NOT_FOUND for non-existent certificate
+
+  Cross-Institution Security Fix
+    ✓ Institution B's authorized issuer attempting to revoke Institution A's certificate must fail
+    ✓ Institution B's authorized issuer attempting to create a new version of Institution A's certificate must fail
+    ✓ Institution A's authorized issuer must still succeed in revocation and versioning
+
+  Expiration
+    ✓ Should return VALID for non-expired certificate
+    ✓ Should return EXPIRED when current time exceeds expiry
+
+  Institution-Controlled Certificate Issuance E2E Workflow
+    ✓ Should reject unauthorized wallet issuance
+    ✓ Should issue certificate via authorized issuer wallet and verify PDF hash
+
+  InstitutionRegistry
+    Registration
+      ✓ Should register a new institution successfully
+      ✓ Should reject duplicate institution ID
+      ✓ Should reject empty institution ID or name
+      ✓ Should reject registration from unauthorized caller
+    Deactivation & Retrieval
+      ✓ Should retrieve an existing institution
+      ✓ Should revert when retrieving a non-existent institution
+      ✓ Should deactivate an active institution
+      ✓ Should revert deactivation for non-existent institution
+
+  Revocation
+    ✓ Should revoke an existing certificate
+    ✓ Institution wallet should be able to revoke
+    ✓ Should reject unauthorized revocation
+    ✓ Should reject double revocation
+
+  Versioning
+    ✓ Should create a new version and increment version number
+    ✓ Should reject unauthorized version creation
+
+  33 passing (4s)
+```
+
+### 30.2 Forensic Lifecycle & Security Isolation Audit
+Run the clean canonical audit suite:
+```bash
+cd member-2-blockchain-application
+node test_clean_canonical_audit.js
+```
+*Validates clean canonical baseline (3 institutions), issuance, valid verification, tampered verification, versioning, revocation, and blocks cross-institution adversarial attacks.*
+
+### 30.3 Frontend Production Build
+```bash
+cd member-1-blockchain-core/frontend
+npm run build
+```
+*Compiles the Vite production client bundle with 0 errors.*
 
 ---
 
-## 22. Security Testing
+## 31. Step-by-Step Demonstration Flow
 
-### Cross-Institution Attack Simulation (`CrossInstitutionSecurity.test.js`)
-1. **Setup:** Institution A (`INST_A`) registers Issuer A. Institution B (`INST_B`) registers Issuer B.
-2. **Action 1:** Issuer A issues certificate `CERT_INST_A_001` on-chain.
-3. **Attack 1:** Issuer B attempts to revoke `CERT_INST_A_001` passing `INST_B`.
-   - **Result:** Reverted with `UnauthorizedIssuer()`.
-4. **Attack 2:** Issuer B attempts to create a new version of `CERT_INST_A_001` passing `INST_B`.
-   - **Result:** Reverted with `UnauthorizedIssuer()`.
-5. **Legitimate Action:** Issuer A revokes and versions their own certificate.
-   - **Result:** Succeeds with event emission.
-
----
-
-## 23. Step-by-Step Demo Flow
-
-1. **Start Blockchain & Backend:** Launch `npx hardhat node` and `node server.js`.
-2. **Open Issuer Portal:** Navigate to `http://localhost:3000/index.html`.
-3. **Authenticate:** Log in with `admin` / `admin123`.
-4. **Issue Certificate:** Enter ID `DEMO-CERT-101`, Student `John Doe`, Course `Computer Science`, attach candidate PDF, and click **Issue Certificate**.
-5. **Inspect Output:** Note the returned SHA-256 hash and generated QR code.
-6. **Public Verification (Genuine):** Navigate to `http://localhost:3000/verify.html`, enter `DEMO-CERT-101`, attach the genuine PDF, and verify ➔ Status returns **`VALID`**.
-7. **Tamper Test:** Edit one character in the PDF using a text editor, re-upload ➔ Status returns **`TAMPERED`**.
-8. **Unknown Certificate Test:** Enter an unissued ID `UNKNOWN-999` ➔ Status returns **`NOT_FOUND`**.
-9. **Create Version 2:** In the Issuer Portal, submit `DEMO-CERT-101` with an updated PDF ➔ Version increments to **`2`**.
-10. **Verify Version 2:** Verifying the updated PDF returns **`VALID` (Version 2)**; verifying the old PDF returns **`TAMPERED`**.
-11. **Revocation:** In the Issuer Portal, submit `DEMO-CERT-101` for revocation ➔ Public verification immediately reflects **`REVOKED`**.
-12. **Audit History:** Review the SQLite `verification_logs` table to confirm all verification attempts were logged.
+1. **Start System:** Launch `npx hardhat node`, deploy contracts (`scripts/deploy.js`), and run `node server.js`.
+2. **Access Issuer Portal:** Navigate to `http://localhost:3000/index.html` and log in (`admin` / `admin123`).
+3. **Issue Certificate:** Enter `CERT-DEMO-001`, student `Alice Johnson`, course `B.Tech Computer Science`, select `DEMO_INST_01`, attach candidate PDF, and click **Issue Certificate**.
+4. **Inspect Receipt:** Observe the generated transaction hash, block confirmation, SHA-256 digest, and embedded QR code.
+5. **Verify Genuine Document:** Open `http://localhost:3000/verify.html`, upload the genuine PDF ➔ Status returns **`VALID` (Version 1)**.
+6. **Simulate Document Tampering:** Modify a single character inside the PDF using any text editor, save, and upload ➔ Status immediately returns **`TAMPERED`**.
+7. **Verify Non-Existent Document:** Enter an unissued ID `UNKNOWN-999` ➔ Status returns **`NOT_FOUND`**.
+8. **Issue Version 2:** In the Issuer Portal, submit `CERT-DEMO-001` with an updated PDF (e.g. revised grade) ➔ Version increments to **`2`**.
+9. **Verify Versioned State:** Uploading the revised PDF returns **`VALID` (Version 2)**; uploading the original v1 PDF returns **`TAMPERED`**.
+10. **Revoke Credential:** Submit `CERT-DEMO-001` for revocation ➔ Public verification immediately returns **`REVOKED`**.
+11. **Review Audit Trail:** Open `http://localhost:5173/activity` or call `GET /api/audit/events` to verify the complete, timestamped chronological audit trail.
 
 ---
 
-## 24. Network Scope & Implementation Characteristics
+## 32. Limitations & Deployment Notes
 
-- **Dual-Network Support:** Configured out-of-the-box for local Hardhat node (`http://127.0.0.1:8545`, Chain ID `31337`) with optional deployment to public Ethereum Sepolia testnet (`Chain ID: 11155111`).
-- **In-Memory Cryptographic Hash Anchor:** Raw PDFs are hashed in volatile RAM using SHA-256 and never stored directly on-chain or on disk.
-- **Credential Model:** Uses standard EVM cryptographic addresses, deterministic SHA-256 proofs, and string credential identifiers.
-- **EVM-Standard Multi-Contract Architecture:** `InstitutionRegistry`, `CertificateRegistry`, and `DigitalCredential` facade pattern.
-- **Web Application Ecosystem:** Institutional and verification portals built with React 19 / Vite and Express / HTML5.
+* **Local vs Production Signer Keys:** In local development, managed institutional signing uses local Hardhat private keys. In production, this must be replaced with cloud KMS or MPC custody.
+* **Gas Sponsorship:** On public networks (e.g., Ethereum Mainnet/Sepolia), institutional wallets must maintain ETH balances to pay transaction gas fees unless account abstraction (ERC-4337) paymasters are implemented.
+* **File Retention:** CredChain does not store PDF files. If a graduate loses their PDF, the blockchain cannot reconstruct the original document; it can only verify an presented document against the recorded cryptographic hash.
 
 ---
 
-## 25. Future Scope
+## 33. Future Scope
 
-- **Decentralized Storage:** Optional integration with encrypted IPFS/Filecoin for verifiable PDF retrieval.
-- **W3C DID Compliance:** Adoption of Decentralized Identifiers (DIDs) for international credential interoperability.
-- **Public Layer-2 Deployment:** Migration to Arbitrum or Polygon for low-cost public production verification.
-- **Zero-Knowledge Proofs (ZKP):** Enabling selective disclosure (e.g., proving graduation without exposing marks).
-- **Mobile Credential Wallet:** Dedicated native iOS/Android mobile wallet application.
-
----
-
-## 26. Technical Design Decisions (Viva Preparation)
-
-1. **Why hash PDFs instead of storing PDFs on-chain?**  
-   *Storing files on-chain is gas-prohibitive and violates privacy principles. A SHA-256 hash uniquely represents the document with zero storage bloat and zero PII leakage.*
-2. **Why use SQLite?**  
-   *Provides a lightweight, zero-configuration off-chain database for searching student names and recording verification audit logs without complex external database servers.*
-3. **Why a hybrid architecture?**  
-   *Combines the immutable trust of blockchain with the speed, searchability, and privacy of traditional relational storage.*
-4. **Why does QR contain only a verification URL?**  
-   *Prevents leaking student personal data or private keys in public QR scans. The verifier must present the actual document to verify authenticity.*
-5. **Why does public verification not require a crypto wallet?**  
-   *Eliminates friction for employers and verifiers. Calling `view` smart contract functions via a backend JSON-RPC provider is free and requires no gas.*
-6. **Why use a facade contract (`DigitalCredential.sol`)?**  
-   *Encapsulates multi-contract coordination into a single integration contract, providing a clean API for backend and frontend developers.*
-7. **Why store `institutionId` inside the `Certificate` struct?**  
-   *Guarantees cryptographic access boundaries on-chain, preventing cross-institution tampering even if an attacker possesses authorized issuer credentials from a different university.*
-8. **Why use SHA-256?**  
-   *Industry-standard cryptographic hash function supported natively in Node.js `crypto` and Solidity `sha256()`, providing 256-bit collision resistance.*
+* **Decentralized Storage (IPFS / Arweave):** Optional integration with decentralized storage networks for encrypted document archiving.
+* **W3C Verifiable Credentials & DIDs:** Alignment with W3C DID standards for international interoperability across decentralized identity wallets.
+* **Layer-2 Rollups:** Deployment to Arbitrum, Optimism, or Polygon for sub-cent transaction costs and instant finality.
+* **Zero-Knowledge Proofs (ZKP):** Enabling selective attribute disclosure (e.g., proving a degree was obtained with GPA > 3.5 without revealing specific course grades).
 
 ---
 
-## 27. Project Results
+## 34. Technical Viva Q&A Guide
 
-- **Contract Tests:** 31 / 31 passing (Hardhat).
-- **Security Validation:** Cross-institution unauthorized attacks reverted successfully.
-- **Full Lifecycle Integration:** Issuance, SHA-256 hashing, QR generation, verification, versioning, revocation, and audit logging verified end-to-end.
-- **Event Synchronization:** Real-time synchronization from blockchain events to SQLite database confirmed.
-- **Code Quality:** Zero console errors, clean separation of concerns, and zero modified source files at freeze.
+1. **Q: Why hash the certificate PDF instead of storing the PDF on the blockchain?**  
+   *A: Storing raw files on-chain is cost-prohibitive in gas fees, bloats the blockchain state, and violates student privacy laws (GDPR/FERPA). A SHA-256 hash uniquely represents the file with 256-bit collision resistance while keeping student PII private.*
+
+2. **Q: How does CredChain prevent cross-institution attacks?**  
+   *A: The smart contract stores the issuing `institutionId` inside the `Certificate` struct on-chain. When revocation or versioning is requested, the contract strictly verifies that the caller's institution matches the certificate's original issuing institution.*
+
+3. **Q: Why is SQLite used alongside the blockchain?**  
+   *A: Blockchain is optimized for immutable state verification, not complex text search or telemetry indexing. SQLite acts as an off-chain cache for fast student name search and non-state-changing verification audit logging.*
+
+4. **Q: What happens if the SQLite database is destroyed or hacked?**  
+   *A: The core security and authenticity of credentials remain 100% intact. Verification queries the smart contract directly, which is authoritative. The SQLite database can be rebuilt from on-chain event logs (`eventListener.js`).*
+
+5. **Q: Does public verification require MetaMask or gas fees?**  
+   *A: No. Public verification calls the smart contract's read-only `verifyCertificate` function via JSON-RPC. Read-only EVM calls are free, require zero gas, and do not need a crypto wallet.*
 
 ---
 
-## 28. Blockchain Guarantees vs Non-Guarantees
+## 35. Blockchain Guarantees vs Non-Guarantees
 
 ### What the Blockchain DOES Guarantee:
-- **Tamper Evidence:** Once a document hash is recorded, altering a single byte in the physical PDF makes it impossible to pass verification.
-- **Immutability of History:** Issuance timestamps, version history, and revocation records cannot be rewritten or erased.
-- **Cryptographic Access Control:** Only whitelisted issuer wallets can record or revoke certificates for their institution.
+* **Tamper Evidence:** Any modification to an issued document causes verification to fail deterministically.
+* **Immutability of History:** Issuance timestamps, version transitions, and revocation records cannot be rewritten or erased.
+* **Cryptographic Access Control:** Only whitelisted institutional wallets can issue, version, or revoke credentials.
 
 ### What the Blockchain DOES NOT Guarantee:
-- **Off-Chain Data Authenticity:** Blockchain proves document integrity from the point of issuance, but cannot verify whether the issuing institution entered accurate student information before signing.
-- **Physical File Persistence:** The blockchain stores the cryptographic proof, not the PDF itself; if the student loses their PDF, the blockchain cannot reconstruct the file.
+* **Real-World Truth of Input Data:** Blockchain guarantees that a recorded document has not been altered since issuance, but cannot independently verify whether an authorized university administrator entered accurate student information before signing.
+* **Physical Document Recovery:** The blockchain stores the cryptographic proof, not the file itself.
 
 ---
 
-## 29. License
+## 36. Technology Stack
+
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Smart Contracts** | Solidity `^0.8.20` | Core smart contract business logic |
+| **EVM Development** | Hardhat `^2.22.0` | EVM compiler, local blockchain node, and automated test runner |
+| **Contract Security** | OpenZeppelin Contracts `^5.0.0` | Standard `Ownable` contract library |
+| **Blockchain Client** | Ethers.js `v6.17.0` | JSON-RPC provider, contract bindings, wallet transactions |
+| **Backend Runtime** | Node.js (ESM) `v18+` | Server runtime environment |
+| **Web Framework** | Express.js `^4.19.2` | RESTful API server |
+| **File Processing** | Multer `^1.4.5-lts.1` | In-memory multipart buffer extraction |
+| **Off-Chain Database** | SQLite3 `^5.1.7` | Metadata storage, event indexing, and verification telemetry |
+| **Authentication** | JSON Web Tokens (JWT) `^9.0.2` | Stateless HTTP bearer token authentication |
+| **QR Code Engine** | QRCode `^1.5.3` | Verification QR code Data URL generation |
+| **Administrative UI** | React 19 / Vite `^6.1.0` | Member 1 administrative dashboard and issuance platform |
+| **Public UI** | HTML5 / CSS3 / JavaScript | Member 2 lightweight public verifier and issuer portals |
+| **PDF Engine** | jsPDF `^4.2.1` | Client-side certificate PDF generation with embedded QR codes |
+| **Cryptography** | Node.js `crypto` & Web Crypto API | SHA-256 cryptographic digest computation |
+| **Testing** | Mocha / Chai (Hardhat) | Automated unit and integration test suite |
+
+---
+
+## 37. License & Project Team
 
 This project is licensed under the **MIT License**.
 
----
-
-## 30. Authors & Project Team
-
-- **Member 1 (Blockchain Core & Trust Layer):** Solidity Smart Contracts, Hardhat Environment, Security Architecture & Test Suite, CredChain React Platform.
-- **Member 2 (Blockchain Application & Verification):** Express.js Backend, Ethers.js Integration, SHA-256 In-Memory Hashing, SQLite Database & Audit Logging, QR Code Engine, Public Verifier & Issuer Web Portals.
-
----
-
-## 31. Related Documentation
-
-- [Member 1 Core Technical Guide](member-1-blockchain-core/README.md)
-- [Member 2 Application Technical Guide](member-2-blockchain-application/README.md)
-- [Master Specification Document (v1.0.0)](file:///C:/Blockchain%20Project/Certificate-Verification-System/README.md)
+### Authors & Project Team
+* **Member 1 (Blockchain Core & Trust Layer Engineer):** Solidity Smart Contracts, Hardhat Environment, Security Architecture, Comprehensive Test Suite (33 tests), CredChain React 19 Platform.
+* **Member 2 (Blockchain Application & Verification Engineer):** Express.js Backend, Ethers.js Integration, Managed Institutional Signing, In-Memory SHA-256 Hashing, SQLite Database & Event Synchronizer, QR Engine, Public Verifier & Issuer Portals.
