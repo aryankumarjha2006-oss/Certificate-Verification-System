@@ -20,6 +20,9 @@ contract InstitutionRegistry is Ownable {
     // Mapping from institution ID to Institution
     mapping(string => Institution) private institutions;
     
+    // Ordered list of registered institution IDs for authoritative on-chain enumeration
+    string[] private institutionIds;
+
     // Mapping from institution ID to a mapping of authorized issuer addresses
     mapping(string => mapping(address => bool)) private authorizedIssuers;
 
@@ -57,8 +60,23 @@ contract InstitutionRegistry is Ownable {
             isActive: true,
             exists: true
         });
+        institutionIds.push(_id);
 
         emit InstitutionRegistered(_id, _name, _wallet);
+    }
+
+    /**
+     * @dev Returns all registered institution IDs directly from on-chain storage.
+     */
+    function getAllInstitutionIds() external view returns (string[] memory) {
+        return institutionIds;
+    }
+
+    /**
+     * @dev Returns total registered institutions count directly from on-chain storage.
+     */
+    function getInstitutionCount() external view returns (uint256) {
+        return institutionIds.length;
     }
 
     /**

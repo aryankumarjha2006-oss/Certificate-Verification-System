@@ -15,13 +15,13 @@ let institutionRegistryContract;
 // Institutional Signer Accounts for Local Development / Hardhat Node
 // Account #1: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 -> DEMO_INST_01, UNIV01, INST-001
 // Account #2: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC -> INST-002
-// Account #3: 0x90F79bf6EB2c4f8090B5E0109d1750572E23707D -> INST-003
+// Account #3: 0x90F79bf6EB2c4f870365E785982E1f101E93b906 -> INST-003
 const DEV_INSTITUTION_KEYS = {
     'DEMO_INST_01': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
     'UNIV01': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
     'INST-001': '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
-    'INST-002': '0x5de4111daf190123ca4321316f6e10423790202130e63e423257d63be074946a',
-    'INST-003': '0x7c852118294e373a230248b79986934c2c02353a9e70d7350582769f9c299935'
+    'INST-002': '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+    'INST-003': '0x7c852118294e51e653712a81e05800f419141751be58f605c371e15141b007a6'
 };
 
 const DEFAULT_INST_KEY = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d'; // Account #1
@@ -51,7 +51,7 @@ export async function connectBlockchain() {
         signer
     );
 
-    const instRegAddress = await digitalCredentialContract.institutionRegistry();
+    const instRegAddress = process.env.INSTITUTION_REGISTRY_ADDRESS || await digitalCredentialContract.institutionRegistry();
     institutionRegistryContract = new ethers.Contract(
         instRegAddress,
         irData.abi,
@@ -67,26 +67,30 @@ export async function connectBlockchain() {
 async function ensureInstitutionalAuthorizations() {
     try {
         console.log('Verifying on-chain institutional wallet authorizations...');
+        const deployerSigner = new ethers.Wallet(process.env.PRIVATE_KEY || '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', provider);
         const inst1Signer = new ethers.Wallet(DEFAULT_INST_KEY, provider); // Account #1
-        const inst2Signer = new ethers.Wallet(DEV_INSTITUTION_KEYS['INST-002'], provider); // Account #2
+        const regContractDeployer = institutionRegistryContract.connect(deployerSigner);
+        const regContractInst1 = institutionRegistryContract.connect(inst1Signer);
+
+        let deployerNonce = await deployerSigner.getNonce('latest');
+        let inst1Nonce = await inst1Signer.getNonce('latest');
 
         const devInstitutions = [
-            { id: 'DEMO_INST_01', name: 'Global Tech University', wallet: inst1Signer.address, signer: inst1Signer },
-            { id: 'UNIV01', name: 'State University', wallet: inst1Signer.address, signer: inst1Signer },
-            { id: 'INST-001', name: 'Institute One', wallet: inst1Signer.address, signer: inst1Signer },
-            { id: 'INST-002', name: 'Polytechnic Institute', wallet: inst2Signer.address, signer: inst2Signer }
+            { id: 'DEMO_INST_01', name: 'Global Tech University', wallet: inst1Signer.address },
+            { id: 'UNIV01', name: 'State University', wallet: inst1Signer.address },
+            { id: 'INST-001', name: 'Institute One', wallet: inst1Signer.address }
         ];
 
         for (const inst of devInstitutions) {
             let instExists = false;
             try {
                 const existing = await institutionRegistryContract.getInstitution(inst.id);
-                instExists = existing.exists;
+                instExists = existing && (existing[4] ?? existing.exists);
             } catch (e) {}
 
             if (!instExists) {
                 console.log(`Registering institution ${inst.id} on-chain...`);
-                const tx = await institutionRegistryContract.registerInstitution(inst.id, inst.name, inst.wallet);
+                const tx = await regContractDeployer.registerInstitution(inst.id, inst.name, inst.wallet, { nonce: deployerNonce++ });
                 await tx.wait();
             }
 
@@ -94,15 +98,8 @@ async function ensureInstitutionalAuthorizations() {
             const isAuth = await institutionRegistryContract.isAuthorizedIssuer(inst.id, inst.wallet);
             if (!isAuth) {
                 console.log(`Authorizing wallet ${inst.wallet} on-chain for ${inst.id}...`);
-                const instRegAsInst = institutionRegistryContract.connect(inst.signer);
-                try {
-                    const tx = await instRegAsInst.authorizeIssuer(inst.id, inst.wallet);
-                    await tx.wait();
-                } catch (authErr) {
-                    // If deployer is wallet owner, try authorizing via deployer
-                    const tx = await institutionRegistryContract.authorizeIssuer(inst.id, inst.wallet);
-                    await tx.wait();
-                }
+                const tx = await regContractInst1.authorizeIssuer(inst.id, inst.wallet, { nonce: inst1Nonce++ });
+                await tx.wait();
             }
         }
         console.log('Institutional wallet authorizations verified on-chain.');
@@ -158,22 +155,33 @@ export async function verifyInstitutionSignerOnChain(institutionId, signerAddres
 
         const registeredWallet = inst.wallet;
         const isAuthorized = await institutionRegistryContract.isAuthorizedIssuer(rawId, signerAddress);
+        const isPrimaryWallet = (registeredWallet.toLowerCase() === signerAddress.toLowerCase());
 
-        if (registeredWallet.toLowerCase() !== signerAddress.toLowerCase() && !isAuthorized) {
-            throw new Error(`Configured signer wallet (${signerAddress}) does not match registered on-chain wallet (${registeredWallet}) or authorized issuer for institution: ${rawId}`);
+        if (!isAuthorized && !isPrimaryWallet) {
+            throw new Error(`Signer wallet ${signerAddress} is not authorized for institution '${rawId}'.`);
         }
+
+        return {
+            isValid: true,
+            institution: {
+                id: inst.id,
+                name: inst.name,
+                wallet: inst.wallet,
+                isActive: inst.isActive
+            },
+            isPrimaryWallet,
+            isAuthorizedIssuer: isAuthorized
+        };
     } catch (err) {
-        if (err.message && (err.message.includes('InstitutionDoesNotExist') || err.message.includes('does not exist'))) {
-            throw new Error(`Institution '${rawId}' is not registered on the blockchain.`);
+        if (err.message && err.message.includes('revert')) {
+            throw new Error(`Institution '${rawId}' does not exist on-chain or caller is unauthorized.`);
         }
         throw err;
     }
 }
 
-export async function getLiveNonce(signer) {
-    const address = await signer.getAddress();
-    const hexCount = await provider.send('eth_getTransactionCount', [address, 'pending']);
-    return parseInt(hexCount, 16);
+export function getDigitalCredentialContract() {
+    return digitalCredentialContract;
 }
 
 export function getDigitalCredentialContractForInstitution(institutionId) {
@@ -181,8 +189,18 @@ export function getDigitalCredentialContractForInstitution(institutionId) {
     return digitalCredentialContract.connect(instSigner);
 }
 
-export function getDigitalCredentialContract() {
-    return digitalCredentialContract;
+export async function getLiveNonce(signerOrAddress) {
+    const addr = typeof signerOrAddress === 'string' ? signerOrAddress : await signerOrAddress.getAddress();
+    return await provider.getTransactionCount(addr, 'pending');
+}
+
+export function parseContractError(err) {
+    if (!err) return 'Unknown error occurred';
+    if (err.reason) return err.reason;
+    if (err.shortMessage) return err.shortMessage;
+    if (err.info && err.info.error && err.info.error.message) return err.info.error.message;
+    if (err.message) return err.message;
+    return String(err);
 }
 
 export function getCertificateRegistryContract() {
@@ -191,49 +209,4 @@ export function getCertificateRegistryContract() {
 
 export function getInstitutionRegistryContract() {
     return institutionRegistryContract;
-}
-
-export function parseContractError(error) {
-    if (!error) return 'Unknown error';
-    if (typeof error === 'string') return error;
-
-    if (error.message) {
-        if (error.message.includes('No blockchain signing identity configured')) {
-            return error.message;
-        }
-        if (error.message.includes('does not match registered on-chain wallet')) {
-            return error.message;
-        }
-        if (error.message.includes('is not registered on the blockchain')) {
-            return error.message;
-        }
-        if (error.message.includes('is marked as inactive')) {
-            return error.message;
-        }
-    }
-
-    const data = error.data || error.info?.error?.data?.data || error.info?.error?.data;
-    if (data && typeof data === 'string') {
-        const errorHash = data.substring(0, 10).toLowerCase();
-        if (errorHash === '0xb41ba2d6') {
-            return 'UnauthorizedIssuer: The designated institutional wallet is not authorized as an issuer on-chain for this institution.';
-        }
-        if (errorHash === '0xa31b2c8e') {
-            return 'InstitutionDoesNotExist: The specified institution ID is not registered on the blockchain.';
-        }
-        if (errorHash === '0x5c427cd9') {
-            return 'UnauthorizedCaller: Only the registered institution primary wallet can perform this operation.';
-        }
-        if (errorHash === '0x60098a58') {
-            return 'CertificateAlreadyExists: A certificate with this ID already exists on the blockchain.';
-        }
-        if (errorHash === '0xfd576a91') {
-            return 'CertificateAlreadyRevoked: This certificate has already been revoked on-chain.';
-        }
-        if (errorHash === '0x91d9d150') {
-            return 'InvalidCertificateData: Certificate ID or document hash cannot be empty.';
-        }
-    }
-
-    return error.reason || error.message || String(error);
 }

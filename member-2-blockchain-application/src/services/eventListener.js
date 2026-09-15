@@ -31,21 +31,31 @@ async function resolveCertificateId(topicOrId, contract) {
         return topicOrId; // already plaintext
     }
 
+    // 1. Authoritative on-chain contract query
+    const crContract = contract || getCertificateRegistryContract();
+    if (crContract && typeof crContract.getAllCertificateIds === 'function') {
+        try {
+            const onChainIds = await crContract.getAllCertificateIds();
+            const matched = onChainIds.find(cid => cid && ethers.id(cid) === topicOrId);
+            if (matched) return matched;
+        } catch (e) {}
+    }
+
     const db = getDb();
     if (!db) return topicOrId;
 
-    // Check DB certificates table
+    // 2. Check DB certificates table
     const certRow = await new Promise((resolve) => {
         db.all('SELECT id FROM certificates', [], (err, rows) => {
             if (err || !rows) return resolve(null);
-            const found = rows.find(r => ethers.id(r.id) === topicOrId);
+            const found = rows.find(r => r.id && ethers.id(r.id) === topicOrId);
             resolve(found ? found.id : null);
         });
     });
 
     if (certRow) return certRow;
 
-    // Check DB blockchain_events table
+    // 3. Check DB blockchain_events table
     const eventRow = await new Promise((resolve) => {
         db.all('SELECT certificateId FROM blockchain_events WHERE certificateId IS NOT NULL', [], (err, rows) => {
             if (err || !rows) return resolve(null);
@@ -65,9 +75,20 @@ async function resolveInstitutionId(topicOrId) {
         return topicOrId;
     }
 
+    // 1. Authoritative on-chain contract query
+    const irContract = getInstitutionRegistryContract();
+    if (irContract && typeof irContract.getAllInstitutionIds === 'function') {
+        try {
+            const onChainIds = await irContract.getAllInstitutionIds();
+            const matched = onChainIds.find(id => id && ethers.id(id) === topicOrId);
+            if (matched) return matched;
+        } catch (e) {}
+    }
+
     const db = getDb();
     if (!db) return topicOrId;
 
+    // 2. Check DB tables
     const row = await new Promise((resolve) => {
         db.all('SELECT institutionId FROM certificates UNION SELECT institutionId FROM blockchain_events WHERE institutionId IS NOT NULL', [], (err, rows) => {
             if (err || !rows) return resolve(null);

@@ -87,10 +87,10 @@ export function Sidebar({ network }) {
           if (isMounted && net) {
             const id = Number(net.chainId);
             const friendlyName =
-              id === 31337 ? 'Hardhat Node' :
+              id === 31337 ? 'Hardhat Local' :
+              id === 11155111 ? 'Ethereum Sepolia' :
               id === 1 ? 'Ethereum Mainnet' :
-              id === 11155111 ? 'Sepolia Testnet' :
-              id === 1337 ? 'Local Geth' : (network || 'Local Node');
+              id === 1337 ? 'Local Geth' : (network || `Chain ${id}`);
             setChainInfo({
               name: network || friendlyName,
               chainId: id,
@@ -101,7 +101,7 @@ export function Sidebar({ network }) {
       } catch (err) {
         if (isMounted) {
           setChainInfo({
-            name: network || 'Local Development',
+            name: network || 'Hardhat Local',
             chainId: 31337,
             status: 'connected'
           });
@@ -159,12 +159,12 @@ export function Sidebar({ network }) {
 
       <nav className="sidebar-nav">
         {navGroups.map((section, sIdx) => (
-          <div key={sIdx} className="nav-section">
+          <div key={section.group || sIdx} className="nav-section">
             <div className="nav-section-title">{section.group}</div>
             <div className="nav-section-items">
-              {section.items.map((item, idx) => (
+              {section.items.map((item) => (
                 <NavLink
-                  key={idx}
+                  key={item.to}
                   to={item.to}
                   className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}
                 >
@@ -181,7 +181,7 @@ export function Sidebar({ network }) {
         <div className="network-status-widget">
           <div className="status-header">
             <span className="status-indicator"></span>
-            <span className="status-title">Local Development</span>
+            <span className="status-title">{chainInfo.chainId === 11155111 ? 'Public Testnet' : 'Local EVM'}</span>
           </div>
           <div className="status-details">
             <span className="network-name">{chainInfo.name}</span>
@@ -195,6 +195,24 @@ export function Sidebar({ network }) {
 
 export function Header({ wallet, network, connect, theme, toggleTheme }) {
   const [copied, setCopied] = React.useState(false);
+  const [activeChain, setActiveChain] = React.useState({ name: network || 'Hardhat Local', chainId: 31337 });
+
+  React.useEffect(() => {
+    async function resolveNetwork() {
+      try {
+        if (blockchainService?.provider) {
+          const net = await blockchainService.provider.getNetwork();
+          const id = Number(net.chainId);
+          const name =
+            id === 31337 ? 'Hardhat Local' :
+            id === 11155111 ? 'Ethereum Sepolia' :
+            id === 1 ? 'Ethereum Mainnet' : `Chain ${id}`;
+          setActiveChain({ name: network || name, chainId: id });
+        }
+      } catch(e) {}
+    }
+    resolveNetwork();
+  }, [network]);
 
   const handleCopy = () => {
     if (wallet) {
@@ -209,13 +227,20 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
       <div className="header-left">
         <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.45rem 0.9rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '320px', border: '1px solid var(--border)' }}>
           <Search size={15} style={{ marginRight: '0.6rem', color: 'var(--text-muted)' }} />
-          <span style={{ fontSize: '0.85rem' }}>Search certificates, hashes, issuers...</span>
+          <span style={{ fontSize: '0.85rem' }}>Search credentials, hashes, issuers...</span>
         </div>
       </div>
       <div className="header-right">
-        <Badge type="info" style={{ fontSize: '0.8rem', padding: '0.4rem 0.6rem' }}>
-          <Shield size={14} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} /> Managed Signing Active
+        {/* Network Badge */}
+        <Badge type={activeChain.chainId === 11155111 ? "primary" : "neutral"} style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }}>
+          {activeChain.name} ({activeChain.chainId})
         </Badge>
+
+        {/* Managed Signing Indicator */}
+        <Badge type="info" style={{ fontSize: '0.78rem', padding: '0.35rem 0.6rem' }} title="Server-managed institutional signing is active. Transactions are signed on-chain by accredited institution wallets.">
+          <Shield size={13} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} /> Managed Signing
+        </Badge>
+
         {toggleTheme && (
           <button
             type="button"
@@ -228,42 +253,21 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
           </button>
         )}
         {wallet ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-             {network === 'Hardhat Local' ? (
-               <Badge type="success">{network}</Badge>
-             ) : (
-               <button
-                 onClick={async () => {
-                   try {
-                     await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x7a69' }] });
-                   } catch (e) {
-                     if (e.code === 4902) {
-                       try {
-                         await window.ethereum.request({
-                           method: 'wallet_addEthereumChain',
-                           params: [{ chainId: '0x7a69', chainName: 'Hardhat Local', rpcUrls: ['http://127.0.0.1:8545'], nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 } }]
-                         });
-                       } catch (addError) { console.error(addError); }
-                     }
-                   }
-                 }}
-                 className="btn btn-warning"
-                 style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', cursor: 'pointer' }}
-               >
-                 Switch to Hardhat
-               </button>
-             )}
-             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-               <span className="mono" style={{ fontWeight: 500 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+             <Badge type="success" style={{ fontSize: '0.75rem' }}>MetaMask</Badge>
+             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--bg-main)', padding: '0.35rem 0.55rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+               <span className="mono" style={{ fontWeight: 500, fontSize: '0.85rem' }}>
                  {wallet.substring(0,6)}...{wallet.substring(38)}
                </span>
-               <button onClick={handleCopy} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)' }}>
-                 {copied ? <CheckCircle size={14} color="var(--success)" /> : <Copy size={14} />}
+               <button onClick={handleCopy} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-muted)' }} title="Copy wallet address">
+                 {copied ? <CheckCircle size={13} color="var(--success)" /> : <Copy size={13} />}
                </button>
              </div>
           </div>
         ) : (
-          <button className="btn btn-secondary" onClick={connect} title="Optional advanced mode: connect browser wallet directly">Connect MetaMask (Optional)</button>
+          <button className="btn btn-secondary" onClick={connect} style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem' }} title="Optional: connect browser wallet for direct Web3 interactions">
+            Connect MetaMask
+          </button>
         )}
       </div>
     </header>

@@ -6,7 +6,7 @@ import InstitutionRegistryABI from "../contracts/InstitutionRegistry.json";
 // Replace with the addresses deployed in your local node
 export const CONTRACT_ADDRESSES = {
   institutionRegistry: import.meta.env.VITE_INSTITUTION_REGISTRY_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  digitalCredential: import.meta.env.VITE_DIGITAL_CREDENTIAL_ADDRESS || "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
+  digitalCredential: import.meta.env.VITE_DIGITAL_CREDENTIAL_ADDRESS || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
 };
 
 export function getInjectedEthereumProvider() {
@@ -108,7 +108,18 @@ class BlockchainService {
   // --- Institution operations ---
   async registerInstitution(id, name, wallet) {
     if (!this.institutionRegistry) throw new Error("Wallet not connected");
-    return await this.institutionRegistry.registerInstitution(id, name, wallet);
+    const contract = this.signer ? this.institutionRegistry.connect(this.signer) : this.institutionRegistry;
+    const tx = await contract.registerInstitution(id, name, wallet);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const cached = JSON.parse(localStorage.getItem('credchain_registered_institutions') || '[]');
+        if (!cached.includes(id)) {
+          cached.push(id);
+          localStorage.setItem('credchain_registered_institutions', JSON.stringify(cached));
+        }
+      }
+    } catch(e) {}
+    return tx;
   }
 
   async authorizeIssuer(instId, issuerWallet) {
@@ -123,22 +134,19 @@ class BlockchainService {
 
   async getAllRegisteredInstitutions() {
     const candidateIds = new Set();
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
 
-    // 1. Discover registered institutions from on-chain event logs
+    // 1. Authoritative On-Chain Enumeration directly from the InstitutionRegistry smart contract
     try {
-      const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
-      const regEvents = await contract.queryFilter(contract.filters.InstitutionRegistered(), 0, "latest");
-      regEvents.forEach(e => {
-        if (e.args && e.args[0]) {
-          const rawId = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0].hash || '');
-          if (rawId && !rawId.startsWith('0x')) {
-            candidateIds.add(rawId);
-          }
+      if (typeof contract.getAllInstitutionIds === 'function') {
+        const onChainIds = await contract.getAllInstitutionIds();
+        if (Array.isArray(onChainIds)) {
+          onChainIds.forEach(id => { if (id && typeof id === 'string') candidateIds.add(id); });
         }
-      });
+      }
     } catch(e) {}
 
-    // 2. Discover from off-chain database certificates
+    // 2. Discover from off-chain database certificates / fallback
     try {
       const res = await fetch('http://localhost:3000/api/certificates');
       if (res.ok) {
@@ -151,34 +159,19 @@ class BlockchainService {
       }
     } catch(e) {}
 
-    // 3. Discover from off-chain analytics institutions endpoint
-    try {
-      const res = await fetch('http://localhost:3000/api/analytics/institutions');
-      if (res.ok) {
-        const instBreakdown = await res.json();
-        if (Array.isArray(instBreakdown)) {
-          instBreakdown.forEach(i => {
-            if (i.institutionId && !i.institutionId.startsWith('0x')) {
-              candidateIds.add(i.institutionId);
-            }
-          });
-        }
-      }
-    } catch(e) {}
-
     const list = [];
-    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
-
     for (const instId of candidateIds) {
       try {
         const inst = await contract.getInstitution(instId);
-        if (inst && (inst[3] !== undefined || inst.isActive !== undefined)) {
+        const exists = Boolean(inst && (inst[4] ?? inst.exists));
+        if (exists) {
           const isActive = Boolean(inst[3] ?? inst.isActive);
           list.push({
             id: String(inst[0] || instId),
             name: String(inst[1] || inst.name || instId),
-            wallet: String(inst[2] || inst.institutionWallet || ''),
-            isActive
+            wallet: String(inst[2] || inst.institutionWallet || inst.wallet || ''),
+            isActive,
+            exists: true
           });
         }
       } catch (err) {}
@@ -282,34 +275,31 @@ class BlockchainService {
   }
 
   async getCredentials() {
+    const discoveredIds = new Set();
+    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+
+    // 1. Authoritative On-Chain Enumeration from CertificateRegistry
+    try {
+      if (typeof contract.getAllCertificateIds === 'function') {
+        const onChainIds = await contract.getAllCertificateIds();
+        if (Array.isArray(onChainIds)) {
+          onChainIds.forEach(id => { if (id && typeof id === 'string') discoveredIds.add(id); });
+        }
+      }
+    } catch(e) {}
+
+    // 2. Off-chain database certificates
     let certList = [];
     try {
       const res = await fetch('http://localhost:3000/api/certificates');
       if (res.ok) {
         certList = await res.json();
+        certList.forEach(c => { if (c.id && !c.id.startsWith('0x')) discoveredIds.add(c.id); });
       }
-    } catch (e) {
-      console.warn("Could not fetch off-chain certificates, falling back to contract state", e);
-    }
-
-    const discoveredIds = new Set(certList.map(c => c.id).filter(Boolean));
-
-    // Also discover on-chain CertificateIssued events directly
-    try {
-      const certRegAddress = await this.digitalCredential.certificateRegistry();
-      const certReg = new ethers.Contract(certRegAddress, [
-        "event CertificateIssued(string indexed certificateId, string certificateHash, address indexed issuer, uint256 expiryTimestamp, uint256 version)"
-      ], this.provider);
-      const issuedEvents = await certReg.queryFilter(certReg.filters.CertificateIssued(), 0, "latest");
-      for (const ev of issuedEvents) {
-        if (ev.args && ev.args[0] && typeof ev.args[0] === 'string' && !ev.args[0].startsWith('0x')) {
-          discoveredIds.add(ev.args[0]);
-        }
-      }
-    } catch(e) {}
+    } catch (e) {}
 
     const enriched = [];
-    const contract = this.digitalCredential || new ethers.Contract(CONTRACT_ADDRESSES.digitalCredential, DigitalCredentialABI.abi, this.provider);
+    const nowSec = Math.floor(Date.now() / 1000);
 
     for (const certId of discoveredIds) {
       try {
@@ -320,21 +310,21 @@ class BlockchainService {
           const statusNum = Number(onChain[5] ?? onChain.status ?? 0);
           const versionNum = Number(onChain[6] ?? onChain.version ?? 1);
           const meta = certList.find(c => c.id === certId) || {};
+          const isExpired = expiryTimestamp > 0 && nowSec > expiryTimestamp;
 
           enriched.push({
             certId: String(onChain[0] || certId),
             issuer: String(onChain[2] || onChain.issuer || '0x000'),
             issueTimestamp,
             expiryTimestamp,
-            status: statusNum === 1 ? 'REVOKED' : 'ACTIVE',
+            status: statusNum === 1 ? 'REVOKED' : (isExpired ? 'EXPIRED' : 'ACTIVE'),
+            isExpired,
             version: versionNum,
             institutionId: String(onChain[8] || onChain.institutionId || meta.institutionId || ''),
             hash: String(onChain[1] || onChain.certificateHash || '')
           });
         }
-      } catch (err) {
-        console.warn(`Certificate ${certId} in database not found on current active blockchain; skipping.`);
-      }
+      } catch (err) {}
     }
 
     return enriched;
@@ -342,22 +332,22 @@ class BlockchainService {
 
   // Event and credentials parsing for Dashboard & Lists
   async getAllEvents() {
-    if (!this.provider || !this.digitalCredential) return { issued: [], revoked: [], institutions: 0 };
+    if (!this.provider || !this.digitalCredential) return { issued: [], revoked: [], expired: [], institutions: 0 };
 
-    let institutionsCount = 0;
-    try {
-      const instEventsFilter = this.institutionRegistry.filters.InstitutionRegistered();
-      const instEvents = await this.institutionRegistry.queryFilter(instEventsFilter, 0, "latest");
-      institutionsCount = instEvents.length;
-    } catch (e) {}
+    const [institutionsList, credentials] = await Promise.all([
+      this.getAllRegisteredInstitutions(),
+      this.getCredentials()
+    ]);
 
-    const credentials = await this.getCredentials();
+    const activeInstitutionsCount = institutionsList.filter(i => i.isActive).length;
 
     const issued = credentials.map(c => ({
       certId: c.certId,
       issuer: c.issuer,
       timestamp: c.issueTimestamp,
+      expiryTimestamp: c.expiryTimestamp,
       status: c.status,
+      isExpired: c.isExpired,
       version: c.version,
       institutionId: c.institutionId
     }));
@@ -366,10 +356,15 @@ class BlockchainService {
       certId: c.certId
     }));
 
+    const expired = credentials.filter(c => c.status === 'EXPIRED').map(c => ({
+      certId: c.certId
+    }));
+
     return {
        issued,
        revoked,
-       institutions: institutionsCount
+       expired,
+       institutions: activeInstitutionsCount
     };
   }
 

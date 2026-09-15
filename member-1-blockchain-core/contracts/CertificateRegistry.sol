@@ -26,6 +26,7 @@ contract CertificateRegistry {
 
     mapping(string => Certificate) private certificates;
     mapping(string => mapping(uint256 => Certificate)) private certificateVersions;
+    string[] private certificateIds;
     InstitutionRegistry public institutionRegistry;
     address public facadeAddress;
 
@@ -79,8 +80,23 @@ contract CertificateRegistry {
         });
         certificates[_certificateId] = newCert;
         certificateVersions[_certificateId][1] = newCert;
+        certificateIds.push(_certificateId);
 
         emit CertificateIssued(_certificateId, _certificateHash, _caller, _expiryTimestamp, 1);
+    }
+
+    /**
+     * @dev Returns all unique certificate IDs directly from on-chain storage.
+     */
+    function getAllCertificateIds() external view returns (string[] memory) {
+        return certificateIds;
+    }
+
+    /**
+     * @dev Returns total unique certificates count directly from on-chain storage.
+     */
+    function getCertificateCount() external view returns (uint256) {
+        return certificateIds.length;
     }
 
     function getCertificate(string memory _certificateId) external view returns (Certificate memory) {

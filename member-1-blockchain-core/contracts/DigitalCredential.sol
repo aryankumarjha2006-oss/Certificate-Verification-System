@@ -33,7 +33,23 @@ contract DigitalCredential {
         return institutionRegistry.isInstitutionActive(_id);
     }
 
+    function getAllInstitutionIds() external view returns (string[] memory) {
+        return institutionRegistry.getAllInstitutionIds();
+    }
+
+    function getInstitutionCount() external view returns (uint256) {
+        return institutionRegistry.getInstitutionCount();
+    }
+
     // --- Certificate Operations (Write & Read) ---
+
+    function getAllCertificateIds() external view returns (string[] memory) {
+        return certificateRegistry.getAllCertificateIds();
+    }
+
+    function getCertificateCount() external view returns (uint256) {
+        return certificateRegistry.getCertificateCount();
+    }
 
     function issueCertificate(
         string memory _institutionId,

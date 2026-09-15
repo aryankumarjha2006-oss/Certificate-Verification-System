@@ -55,31 +55,39 @@ export default function Settings({ network }) {
           </div>
         </Card>
 
-        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Shield size={18}/> Security & Network</div>}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-               <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Smart Contract Network</div>
+        <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Shield size={18}/> Security & Blockchain Architecture</div>}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)' }}>
+               <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Blockchain Network</div>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 <div style={{ fontWeight: 600 }}>{network || 'Not Connected'}</div>
+                 <div style={{ fontWeight: 600 }}>{network || 'Hardhat Local (Chain ID: 31337)'}</div>
                  <Badge type="success">Active</Badge>
                </div>
              </div>
 
-             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-               <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Connected Wallet</div>
+             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)' }}>
+               <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.25rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Signing Pipeline Mode</div>
                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                 {blockchainService.provider ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Wallet size={16} color="var(--primary)" />
-                      <span className="mono" style={{ fontWeight: 600 }}>Connected</span>
-                    </div>
-                 ) : (
-                    <div style={{ fontWeight: 600, color: 'var(--warning)' }}>Not Connected</div>
-                 )}
+                 <div style={{ fontWeight: 600 }}>Managed Institutional Signing</div>
+                 <Badge type="info">Primary</Badge>
                </div>
-               <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                 CredChain uses Web3 Provider injection (e.g. MetaMask). Network switching must be done within your wallet extension.
+               <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                 Backend service signs blockchain transactions with accredited institutional authority wallets. MetaMask extension is optional.
                </p>
+             </div>
+
+             <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', background: 'var(--bg-main)' }}>
+               <div style={{ color: 'var(--text-muted)', fontSize: '0.78rem', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Configured Smart Contracts</div>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.82rem' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                   <span style={{ color: 'var(--text-muted)' }}>InstitutionRegistry:</span>
+                   <span className="mono">{blockchainService?.institutionRegistry?.target || '0x5FbDB2315678afecb367f032d93F642f64180aa3'}</span>
+                 </div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                   <span style={{ color: 'var(--text-muted)' }}>DigitalCredential (Facade):</span>
+                   <span className="mono">{blockchainService?.digitalCredential?.target || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9'}</span>
+                 </div>
+               </div>
              </div>
           </div>
         </Card>

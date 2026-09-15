@@ -6,30 +6,6 @@ export const getSummary = async (req, res) => {
         const db = getDb();
         if (!db) return res.status(500).json({ error: 'Database not initialized' });
 
-        // 1. Discover all unique certificate IDs from DB certificates table AND blockchain_events
-        const dbCertRows = await new Promise((resolve) => {
-            db.all('SELECT id, status, issueDate, institutionId FROM certificates', [], (err, rows) => resolve(rows || []));
-        });
-
-        const eventCertRows = await new Promise((resolve) => {
-            db.all(
-                `SELECT DISTINCT certificateId, eventType FROM blockchain_events WHERE certificateId IS NOT NULL AND certificateId != ''`,
-                [],
-                (err, rows) => resolve(rows || [])
-            );
-        });
-
-        // Collect all distinct plaintext certificate IDs
-        const uniqueCertIds = new Set();
-        for (const row of dbCertRows) {
-            if (row.id) uniqueCertIds.add(row.id);
-        }
-        for (const row of eventCertRows) {
-            if (row.certificateId && !row.certificateId.startsWith('0x')) {
-                uniqueCertIds.add(row.certificateId);
-            }
-        }
-
         // Query on-chain CertificateRegistry / DigitalCredential contract if available
         let crContract = null;
         let irContract = null;
@@ -37,6 +13,26 @@ export const getSummary = async (req, res) => {
             crContract = getCertificateRegistryContract();
             irContract = getInstitutionRegistryContract();
         } catch (e) {}
+
+        const uniqueCertIds = new Set();
+
+        // 1. Authoritative on-chain certificate discovery
+        if (crContract && typeof crContract.getAllCertificateIds === 'function') {
+            try {
+                const onChainIds = await crContract.getAllCertificateIds();
+                for (const cid of onChainIds) {
+                    if (cid && typeof cid === 'string') uniqueCertIds.add(cid);
+                }
+            } catch (e) {}
+        }
+
+        // Database fallback & cross-check
+        const dbCertRows = await new Promise((resolve) => {
+            db.all('SELECT id, status, issueDate, institutionId FROM certificates', [], (err, rows) => resolve(rows || []));
+        });
+        for (const row of dbCertRows) {
+            if (row.id && !row.id.startsWith('0x')) uniqueCertIds.add(row.id);
+        }
 
         const nowSec = Math.floor(Date.now() / 1000);
         let activeCount = 0;
@@ -88,9 +84,18 @@ export const getSummary = async (req, res) => {
         const totalRevoked = revokedCount;
         const totalExpired = expiredCount;
 
-        // 2. Discover registered active institutions
+        // 2. Discover registered active institutions directly from on-chain contract
         const activeInstSet = new Set();
         const candidateInstIds = new Set();
+
+        if (irContract && typeof irContract.getAllInstitutionIds === 'function') {
+            try {
+                const onChainInstIds = await irContract.getAllInstitutionIds();
+                for (const id of onChainInstIds) {
+                    if (id && typeof id === 'string') candidateInstIds.add(id);
+                }
+            } catch (e) {}
+        }
 
         const dbInstRows = await new Promise((resolve) => {
             db.all(
@@ -109,19 +114,6 @@ export const getSummary = async (req, res) => {
         }
 
         if (irContract) {
-            // Also discover from on-chain InstitutionRegistered events
-            try {
-                const regEvents = await irContract.queryFilter(irContract.filters.InstitutionRegistered(), 0, 'latest');
-                for (const ev of regEvents) {
-                    if (ev.args && ev.args[0]) {
-                        const rawId = typeof ev.args[0] === 'string' ? ev.args[0] : '';
-                        if (rawId && !rawId.startsWith('0x')) {
-                            candidateInstIds.add(rawId);
-                        }
-                    }
-                }
-            } catch (e) {}
-
             for (const instId of candidateInstIds) {
                 try {
                     const inst = await irContract.getInstitution(instId);
@@ -319,6 +311,23 @@ export const getInstitutionBreakdown = async (req, res) => {
         const db = getDb();
         if (!db) return res.status(500).json({ error: 'Database not initialized' });
 
+        let irContract = null;
+        try {
+            irContract = getInstitutionRegistryContract();
+        } catch (e) {}
+
+        const map = new Map();
+        const candidateInsts = new Set();
+
+        if (irContract && typeof irContract.getAllInstitutionIds === 'function') {
+            try {
+                const onChainInstIds = await irContract.getAllInstitutionIds();
+                for (const id of onChainInstIds) {
+                    if (id && typeof id === 'string') candidateInsts.add(id);
+                }
+            } catch (e) {}
+        }
+
         const eventRows = await new Promise((resolve) => {
             db.all(
                 `SELECT institutionId, COUNT(DISTINCT certificateId) as count 
@@ -341,14 +350,35 @@ export const getInstitutionBreakdown = async (req, res) => {
             );
         });
 
-        const map = new Map();
         for (const r of eventRows) {
-            if (r.institutionId) map.set(r.institutionId, Number(r.count));
+            if (r.institutionId && !r.institutionId.startsWith('0x')) {
+                candidateInsts.add(r.institutionId);
+                map.set(r.institutionId, Number(r.count));
+            }
         }
         for (const r of certRows) {
-            if (r.institutionId) {
+            if (r.institutionId && !r.institutionId.startsWith('0x')) {
+                candidateInsts.add(r.institutionId);
                 const cur = map.get(r.institutionId) || 0;
                 map.set(r.institutionId, Math.max(cur, Number(r.count)));
+            }
+        }
+
+        // Ensure all verified on-chain active institutions exist in the breakdown
+        if (irContract) {
+            for (const instId of candidateInsts) {
+                try {
+                    const inst = await irContract.getInstitution(instId);
+                    if (inst && (inst[4] ?? inst.exists) && (inst[3] ?? inst.isActive)) {
+                        if (!map.has(instId)) {
+                            map.set(instId, 0);
+                        }
+                    } else {
+                        map.delete(instId);
+                    }
+                } catch (e) {
+                    map.delete(instId);
+                }
             }
         }
 

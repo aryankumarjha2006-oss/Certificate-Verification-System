@@ -189,17 +189,14 @@ export default function Analytics() {
 
       const [eInsts, eIssuers, eIssued, eRevoked] = await Promise.all([p1, p2, p3, p4]);
 
-      const parseArg = (val) => {
-        if (typeof val === 'string') return val;
-        if (val && typeof val === 'object' && val.hash) return val.hash;
-        return String(val ?? '');
-      };
+      const [registeredInstitutions, authorizedIssuers, credentials] = await Promise.all([
+        blockchainService.getAllRegisteredInstitutions(),
+        blockchainService.getAllAuthorizedIssuers(),
+        blockchainService.getCredentials()
+      ]);
 
-      const uniqueInsts = new Set(eInsts.map(e => parseArg(e.args[0])).filter(Boolean)).size;
-      const uniqueIssuers = new Set(eIssuers.map(e => `${parseArg(e.args[0])}-${parseArg(e.args[1])}`)).size;
-
-      // Discover credentials from blockchainService
-      const credentials = await blockchainService.getCredentials();
+      const uniqueInsts = registeredInstitutions.filter(i => i.isActive).length;
+      const uniqueIssuers = new Set(authorizedIssuers.map(i => `${i.instId}-${i.wallet}`)).size;
       const uniqueIssued = credentials.length;
       const activeCount = credentials.filter(c => c.status === 'ACTIVE').length;
       const revokedCount = credentials.filter(c => c.status === 'REVOKED').length;
@@ -307,20 +304,36 @@ export default function Analytics() {
         <ErrorState title="Failed to Load Analytics" message={error} onRetry={loadAnalytics} />
       ) : (
         <>
-          {/* Primary Summary Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
-            <StatCard title="Total Issued" value={summary.totalIssued} icon={FileText} color="var(--primary)" />
-            <StatCard title="Active Credentials" value={summary.activeCertificates} icon={CheckCircle} color="var(--success)" />
-            <StatCard title="Revoked Credentials" value={summary.totalRevoked} icon={XCircle} color="var(--danger)" />
-            <StatCard title="Expired Credentials" value={summary.totalExpired} icon={AlertTriangle} color="var(--warning)" />
+          {/* Primary Summary Metrics (On-Chain Truth) */}
+          <div style={{ marginBottom: '1.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                On-Chain Lifecycle Metrics (Ethereum Blockchain State)
+              </div>
+              <Badge type="success">Authoritative On-Chain</Badge>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+              <StatCard title="Total Issued" value={summary.totalIssued} icon={FileText} color="var(--primary)" />
+              <StatCard title="Active Credentials" value={summary.activeCertificates} icon={CheckCircle} color="var(--success)" />
+              <StatCard title="Revoked Credentials" value={summary.totalRevoked} icon={XCircle} color="var(--danger)" />
+              <StatCard title="Expired Credentials" value={summary.totalExpired} icon={AlertTriangle} color="var(--warning)" />
+            </div>
           </div>
 
-          {/* Secondary Summary Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
-            <StatCard title="Total Institutions" value={summary.totalInstitutions} icon={Building2} color="var(--accent)" />
-            <StatCard title="Authorized Issuers" value={summary.totalIssuers} icon={ShieldCheck} color="var(--primary)" />
-            <StatCard title="Total Verifications" value={summary.totalVerifications} icon={Activity} color="var(--accent)" />
-            <StatCard title="Tampered Attempts" value={summary.tamperedAttempts} icon={XCircle} color="var(--danger)" />
+          {/* Secondary Summary Metrics (Institutions & Verification Telemetry) */}
+          <div style={{ marginBottom: '2rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Governance & Verification Telemetry (Institutions & Verification Logs)
+              </div>
+              <Badge type="info">Hybrid Governance & Logs</Badge>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.5rem' }}>
+              <StatCard title="Total Institutions" value={summary.totalInstitutions} icon={Building2} color="var(--accent)" />
+              <StatCard title="Authorized Issuers" value={summary.totalIssuers} icon={ShieldCheck} color="var(--primary)" />
+              <StatCard title="Public Verifications" value={summary.totalVerifications} icon={Activity} color="var(--accent)" />
+              <StatCard title="Tampered Detections" value={summary.tamperedAttempts} icon={XCircle} color="var(--danger)" />
+            </div>
           </div>
 
           {/* Time Series Trends Grid */}

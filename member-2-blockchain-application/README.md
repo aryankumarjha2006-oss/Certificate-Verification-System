@@ -44,7 +44,7 @@ SQLite Indexer & Off-Chain Metadata Cache
 
 ## 🛡️ Production Key Management & Custody Architecture
 
-For local development and testing, CredChain uses Hardhat development accounts mapped to institution IDs (`DEMO_INST_01` -> Account #1 `0x7099...79C8`, `INST-002` -> Account #2 `0x3C44...93BC`).
+For local development and testing, CredChain uses Hardhat development accounts mapped to canonical institutions (`DEMO_INST_01`, `UNIV01`, `INST-001` -> Account #1 `0x7099...79C8`) and security test fixtures (`INST-002` -> Account #2 `0x3C44...93BC`). Canonical institutions are automatically registered and authorized at startup, while `INST-002` is reserved strictly for on-demand cross-institution isolation tests.
 
 For production deployment, the local signer key resolver (`getInstitutionSigner`) can be seamlessly swapped to enterprise key custody solutions:
 

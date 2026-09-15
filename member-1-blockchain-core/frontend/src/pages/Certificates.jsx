@@ -52,14 +52,21 @@ export default function Certificates() {
       setRegisteredInstitutions(registeredList);
 
       const revokedSet = new Set((data.revoked || []).map(r => r.certId));
+      const expiredSet = new Set((data.expired || []).map(e => e.certId));
 
-      const enriched = (data.issued || []).map(cert => ({
-        ...cert,
-        status: revokedSet.has(cert.certId) || cert.status === 'REVOKED' ? 'REVOKED' : 'ACTIVE',
-        issueDate: cert.timestamp && Number(cert.timestamp) > 0
-          ? new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
-          : '—'
-      }));
+      const enriched = (data.issued || []).map(cert => {
+        const isRevoked = revokedSet.has(cert.certId) || cert.status === 'REVOKED';
+        const isExpired = expiredSet.has(cert.certId) || cert.status === 'EXPIRED';
+        const status = isRevoked ? 'REVOKED' : (isExpired ? 'EXPIRED' : 'ACTIVE');
+
+        return {
+          ...cert,
+          status,
+          issueDate: cert.timestamp && Number(cert.timestamp) > 0
+            ? new Date(Number(cert.timestamp) * 1000).toLocaleDateString()
+            : '—'
+        };
+      });
 
       setCredentials(enriched);
     } catch (err) {
@@ -433,7 +440,7 @@ export default function Certificates() {
                     </td>
                     <td>{cert.issueDate}</td>
                     <td>
-                      <Badge type={cert.status === 'ACTIVE' ? 'success' : 'danger'}>{cert.status}</Badge>
+                      <Badge type={cert.status === 'ACTIVE' ? 'success' : cert.status === 'REVOKED' ? 'danger' : 'warning'}>{cert.status}</Badge>
                     </td>
                     <td style={{textAlign: 'right'}}>
                       <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -460,7 +467,7 @@ export default function Certificates() {
         {step === 1 && (
           <form onSubmit={handleGeneratePdf}>
             <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', border: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              <strong>Institution-Controlled Issuance:</strong> Fills certificate details, generates the PDF with an embedded verification QR code, computes its SHA-256 hash, and prompts your MetaMask wallet for on-chain signing.
+              <strong>Institutional Issuance Flow:</strong> Generates a deterministic certificate PDF with an embedded verification QR code, computes its SHA-256 hash in memory, and submits the transaction on-chain via your verified institutional signing identity.
             </div>
 
             <div className="form-group" style={{ marginBottom: '1rem' }}>
@@ -555,7 +562,7 @@ export default function Certificates() {
                 <FileText size={24} />
               </div>
               <h3 style={{ margin: '0 0 0.25rem 0' }}>Certificate Ready for Blockchain Signing</h3>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>The final PDF has been compiled with an embedded QR code and hashed.</p>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>The final PDF has been compiled with an embedded QR code and hashed in memory.</p>
             </div>
 
             <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '1.5rem' }}>
@@ -582,16 +589,21 @@ export default function Certificates() {
               </div>
             </div>
 
-            {/* Authorization Status Badge */}
+            {/* Authorization & Signing Identity Card */}
             {authCheck.checking ? (
               <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)', fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center', marginBottom: '1.5rem' }}>
                 Verifying on-chain issuer authorization...
               </div>
             ) : authCheck.isAuthorized ? (
-              <div style={{ padding: '0.75rem 1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: 'var(--radius-md)', color: 'var(--success)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-                <ShieldCheck size={18} />
-                <div>
-                  <strong>Institutional Blockchain Identity Verified:</strong> Designated signer wallet <span className="mono">{authCheck.connectedAddress?.substring(0, 8)}...</span> is authorized to sign on-chain for {formData.instId}.
+              <div style={{ padding: '0.85rem 1rem', background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.25)', borderRadius: 'var(--radius-md)', color: 'var(--text-main)', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', fontWeight: 600, marginBottom: '0.35rem' }}>
+                  <ShieldCheck size={18} />
+                  <span>Managed Institutional Signing Identity Ready</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', lineHeight: '1.4' }}>
+                  <div><strong>Signer Identity:</strong> <span className="mono">{authCheck.connectedAddress}</span></div>
+                  <div><strong>Institution:</strong> {formData.instName} ({formData.instId})</div>
+                  <div><strong>Mode:</strong> Managed Institutional Signing (Gas handled by institution node)</div>
                 </div>
               </div>
             ) : (
@@ -599,6 +611,17 @@ export default function Certificates() {
                 <AlertTriangle size={18} style={{ marginTop: '2px', flexShrink: 0 }} />
                 <div>
                   <strong>Authorization Error:</strong> {authCheck.reason || "Institution signer wallet is not authorized."}
+                </div>
+              </div>
+            )}
+
+            {issuing && (
+              <div style={{ padding: '0.85rem', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: '1.25rem', textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.25rem' }}>
+                  Processing Blockchain Transaction...
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Hashing PDF ➔ Calling Smart Contract ➔ Awaiting Block Confirmation
                 </div>
               </div>
             )}
@@ -631,7 +654,7 @@ export default function Certificates() {
             </div>
             <h2 style={{ color: 'var(--success)', margin: '0 0 0.5rem 0' }}>Certificate Issued Successfully!</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              The transaction has been confirmed on the blockchain by your institution wallet.
+              The cryptographic proof has been confirmed on the Ethereum blockchain by your verified institutional signer.
             </p>
 
             <div style={{ background: 'var(--bg-main)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', textAlign: 'left', marginBottom: '1.5rem' }}>
@@ -641,11 +664,25 @@ export default function Certificates() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
                 <span>On-Chain Status:</span>
-                <Badge type="success">ACTIVE</Badge>
+                <Badge type="success">ACTIVE (Confirmed)</Badge>
               </div>
+              {issuedResult.issuer && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                  <span>Signing Wallet:</span>
+                  <span className="mono" style={{ fontSize: '0.8rem' }}>{issuedResult.issuer.substring(0, 10)}...{issuedResult.issuer.substring(34)}</span>
+                </div>
+              )}
+              {issuedResult.blockNumber && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+                  <span>Block Number:</span>
+                  <span className="mono" style={{ fontWeight: 600 }}>#{issuedResult.blockNumber}</span>
+                </div>
+              )}
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Transaction Hash</div>
-                <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-main)', wordBreak: 'break-all' }}>{issuedResult.txHash}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>Transaction Hash</div>
+                <div className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-main)', wordBreak: 'break-all', background: 'var(--bg-card)', padding: '0.4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                  {issuedResult.txHash}
+                </div>
               </div>
             </div>
 
@@ -655,10 +692,10 @@ export default function Certificates() {
               </button>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <button className="btn btn-secondary" onClick={() => { setIsModalOpen(false); navigate(`/credentials/${issuedResult.certId}`); }}>
-                  View Credential
+                  View Credential History
                 </button>
                 <button className="btn btn-secondary" onClick={() => { setIsModalOpen(false); navigate(`/verify?id=${issuedResult.certId}`); }}>
-                  Verify PDF
+                  Test Verification
                 </button>
               </div>
             </div>

@@ -130,7 +130,7 @@ export default function Institutions() {
                     <td style={{ fontWeight: 500 }}>{inst.id}</td>
                     <td>{inst.name}</td>
                     <td className="mono" style={{ fontSize: '0.85rem' }}>{inst.wallet}</td>
-                    <td><Badge type="success">{inst.status}</Badge></td>
+                    <td><Badge type={inst.status === 'ACTIVE' ? 'success' : 'danger'}>{inst.status}</Badge></td>
                   </tr>
                 ))}
               </tbody>
