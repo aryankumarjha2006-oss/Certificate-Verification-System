@@ -2,13 +2,20 @@
 
 This guide provides instructions on how to integrate the backend application with the deployed smart contracts.
 
-## 1. Contract Addresses
+## 1. Network Environments & Contract Addresses
 
-After deploying the contracts locally, you will receive three addresses (see the terminal output from `npx hardhat run scripts/deploy.js --network localhost`). Save these addresses in your backend `.env` file.
+CredChain can run against either local Hardhat EVM or the public Ethereum Sepolia testnet:
 
-- `InstitutionRegistry Address`
-- `CertificateRegistry Address`
-- `DigitalCredential Address`
+| Network | Chain ID | Deployment Command |
+| :--- | :--- | :--- |
+| **Hardhat Local** | `31337` | `npx hardhat run scripts/deploy.js --network localhost` |
+| **Ethereum Sepolia** | `11155111` | `npx hardhat run scripts/deploy.js --network sepolia` |
+
+After deploying the contracts, you will receive three addresses printed in the terminal. Save these addresses in your backend and frontend configuration (`.env`):
+
+- `INSTITUTION_REGISTRY_ADDRESS`
+- `CERTIFICATE_REGISTRY_ADDRESS`
+- `DIGITAL_CREDENTIAL_ADDRESS`
 
 ## 2. ABI Location
 

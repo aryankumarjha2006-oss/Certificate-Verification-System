@@ -111,27 +111,29 @@ export default function Certificates() {
       // Verify designated institutional wallet authorization on-chain
       try {
         const instInfo = await blockchainService.getInstitution(formData.instId.trim());
-        if (instInfo && instInfo.exists && instInfo.isActive) {
+        const isActive = Boolean(instInfo?.isActive ?? instInfo?.[3] ?? false);
+        const wallet = String(instInfo?.institutionWallet ?? instInfo?.wallet ?? instInfo?.[2] ?? '');
+        if (instInfo && isActive && wallet && wallet !== '0x0000000000000000000000000000000000000000') {
           setAuthCheck({
             checking: false,
             isAuthorized: true,
             reason: '',
-            connectedAddress: instInfo.wallet || '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+            connectedAddress: wallet
           });
         } else {
           setAuthCheck({
             checking: false,
-            isAuthorized: true, // Allow dev fallback
-            reason: '',
-            connectedAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+            isAuthorized: false,
+            reason: `Institution "${formData.instId.trim()}" is not registered or is inactive on-chain.`,
+            connectedAddress: null
           });
         }
       } catch (checkErr) {
         setAuthCheck({
           checking: false,
-          isAuthorized: true,
-          reason: '',
-          connectedAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8'
+          isAuthorized: false,
+          reason: checkErr.message || 'Failed to verify institution authorization on-chain.',
+          connectedAddress: null
         });
       }
 

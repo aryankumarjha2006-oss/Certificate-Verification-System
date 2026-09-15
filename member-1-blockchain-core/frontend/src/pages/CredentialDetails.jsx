@@ -36,29 +36,49 @@ export default function CredentialDetails() {
 
       const versionCount = Number(mainCert[6] ?? mainCert.version ?? 1);
       const vList = [];
+      const nowSec = Math.floor(Date.now() / 1000);
 
       for (let i = versionCount; i >= 1; i--) {
         try {
           const vData = await blockchainService.getCertificateVersion(id, i);
+          const rawStatus = Number(vData[5] ?? vData.status ?? 0);
+          const expiry = Number(vData[4] ?? vData.expiryTimestamp ?? 0);
+
+          let lifecycleStatus = 'ACTIVE';
+          if (rawStatus === 1) {
+            lifecycleStatus = 'REVOKED';
+          } else if (expiry > 0 && nowSec > expiry) {
+            lifecycleStatus = 'EXPIRED';
+          }
+
           vList.push({
             version: Number(vData[6] ?? vData.version ?? i),
             hash: String(vData[1] ?? vData.certificateHash ?? ''),
             issuer: String(vData[2] ?? vData.issuer ?? ''),
             issueTimestamp: Number(vData[3] ?? vData.issueTimestamp ?? 0),
-            expiry: Number(vData[4] ?? vData.expiryTimestamp ?? 0),
-            status: Number(vData[5] ?? vData.status ?? 0) === 1 ? 'REVOKED' : 'ACTIVE',
+            expiry: expiry,
+            status: lifecycleStatus,
             institutionId: String(vData[8] ?? vData.institutionId ?? '')
           });
         } catch(e) {
           console.error("Failed to load version", i, e);
           if (i === versionCount || vList.length === 0) {
+            const rawStatus = Number(mainCert[5] ?? mainCert.status ?? 0);
+            const expiry = Number(mainCert[4] ?? mainCert.expiryTimestamp ?? 0);
+            let lifecycleStatus = 'ACTIVE';
+            if (rawStatus === 1) {
+              lifecycleStatus = 'REVOKED';
+            } else if (expiry > 0 && nowSec > expiry) {
+              lifecycleStatus = 'EXPIRED';
+            }
+
             vList.push({
               version: Number(mainCert[6] ?? mainCert.version ?? 1),
               hash: String(mainCert[1] ?? mainCert.certificateHash ?? ''),
               issuer: String(mainCert[2] ?? mainCert.issuer ?? ''),
               issueTimestamp: Number(mainCert[3] ?? mainCert.issueTimestamp ?? 0),
-              expiry: Number(mainCert[4] ?? mainCert.expiryTimestamp ?? 0),
-              status: Number(mainCert[5] ?? mainCert.status ?? 0) === 1 ? 'REVOKED' : 'ACTIVE',
+              expiry: expiry,
+              status: lifecycleStatus,
               institutionId: String(mainCert[8] ?? mainCert.institutionId ?? '')
             });
           }
@@ -92,8 +112,23 @@ export default function CredentialDetails() {
       );
   }
 
+  const latestVersionNumber = versions[0]?.version;
   const currentVersionData = versions.find(v => v.version === selectedVersion) || versions[0];
+  const isSelectedLatest = currentVersionData.version === latestVersionNumber;
   const compVersionData = compareVersion ? versions.find(v => v.version === compareVersion) : null;
+
+  const getLifecycleBadge = (status) => {
+    switch (status) {
+      case 'ACTIVE':
+        return <Badge type="success">ACTIVE</Badge>;
+      case 'REVOKED':
+        return <Badge type="danger">REVOKED</Badge>;
+      case 'EXPIRED':
+        return <Badge type="warning">EXPIRED</Badge>;
+      default:
+        return <Badge type="neutral">{status}</Badge>;
+    }
+  };
 
   return (
     <div>
@@ -109,8 +144,8 @@ export default function CredentialDetails() {
 
           <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Clock size={18}/> Version Timeline</div>}>
              <div style={{position: 'relative', paddingLeft: '2rem', borderLeft: '2px solid var(--border)'}}>
-                 {versions.map((v, idx) => {
-                     const isLatest = idx === 0;
+                 {versions.map((v) => {
+                     const isLatest = v.version === latestVersionNumber;
                      const isSelected = v.version === selectedVersion;
                      return (
                          <div key={v.version}
@@ -138,7 +173,14 @@ export default function CredentialDetails() {
                              }} />
                              <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem'}}>
                                  <h3 style={{margin: 0, fontSize: '1.1rem'}}>Version {v.version}</h3>
-                                 {isLatest && <Badge type="success">CURRENT</Badge>}
+                                 <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                     {isLatest ? (
+                                         <Badge type="primary">CURRENT</Badge>
+                                     ) : (
+                                         <Badge type="neutral">SUPERSEDED</Badge>
+                                     )}
+                                     {getLifecycleBadge(v.status)}
+                                 </div>
                              </div>
                              <div style={{fontSize: '0.9rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
                                  <div><span style={{fontWeight: 500}}>Hash:</span> <span className="mono">{v.hash.substring(0, 10)}...{v.hash.substring(v.hash.length - 10)}</span></div>
@@ -154,15 +196,25 @@ export default function CredentialDetails() {
           <div style={{display: 'flex', flexDirection: 'column', gap: '2rem'}}>
               <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><FileText size={18}/> Selected Version Details</div>}>
                   <div style={{display: 'flex', flexDirection: 'column', gap: '1.5rem'}}>
-                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+                      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem'}}>
                           <div>
                              <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version Number</div>
-                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version} {currentVersionData.version === versions[0].version && "(Latest)"}</div>
+                             <div style={{fontWeight: 600, fontSize: '1.1rem'}}>Version {currentVersionData.version}</div>
                           </div>
                           <div>
-                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Status</div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Version State</div>
                              <div style={{marginTop: '0.25rem'}}>
-                               <Badge type={currentVersionData.status === 'ACTIVE' ? 'success' : 'danger'}>{currentVersionData.status}</Badge>
+                               {isSelectedLatest ? (
+                                 <Badge type="primary">CURRENT</Badge>
+                               ) : (
+                                 <Badge type="neutral">SUPERSEDED</Badge>
+                               )}
+                             </div>
+                          </div>
+                          <div>
+                             <div style={{color: 'var(--text-muted)', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.25rem'}}>Lifecycle Status</div>
+                             <div style={{marginTop: '0.25rem'}}>
+                               {getLifecycleBadge(currentVersionData.status)}
                              </div>
                           </div>
                       </div>
@@ -193,7 +245,7 @@ export default function CredentialDetails() {
 
               <Card title={<div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}><Search size={18}/> Hash Comparison</div>}>
                  <p style={{fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1.5rem'}}>
-                     Cryptographically compare the selected Version {currentVersionData.version} hash with another version to verify integrity across updates.
+                     Cryptographically compare the selected Version {currentVersionData.version} hash with another version to inspect document content differences across revisions.
                  </p>
                  <div style={{marginBottom: '1.5rem'}}>
                      <select className="form-input" value={compareVersion || ''} onChange={e => setCompareVersion(e.target.value ? Number(e.target.value) : null)} style={{width: '100%'}}>
@@ -214,11 +266,25 @@ export default function CredentialDetails() {
                              <span style={{fontSize: '0.9rem', color: 'var(--text-muted)'}}>Version {compVersionData.version}</span>
                              <span className="mono" style={{fontSize: '0.95rem'}}>{compVersionData.hash.substring(0, 16)}...</span>
                          </div>
-                         <div style={{marginTop: '0.5rem', textAlign: 'center'}}>
+                         <div style={{marginTop: '0.75rem', padding: '1rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', textAlign: 'center'}}>
                              {currentVersionData.hash === compVersionData.hash ? (
-                                 <Badge type="success">Hashes Match Exactly</Badge>
+                                 <div>
+                                     <div style={{marginBottom: '0.5rem'}}>
+                                         <Badge type="success">Hashes match</Badge>
+                                     </div>
+                                     <div style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>
+                                         Both versions reference identical document content.
+                                     </div>
+                                 </div>
                              ) : (
-                                 <Badge type="warning">Hashes Differ Cryptographically</Badge>
+                                 <div>
+                                     <div style={{marginBottom: '0.5rem'}}>
+                                         <Badge type="info">Documents are cryptographically distinct</Badge>
+                                     </div>
+                                     <div style={{fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4'}}>
+                                         The recorded hashes differ, confirming that the selected versions reference different document contents.
+                                     </div>
+                                 </div>
                              )}
                          </div>
                      </div>

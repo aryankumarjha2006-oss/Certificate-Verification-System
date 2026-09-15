@@ -534,6 +534,8 @@ npx hardhat node
 *Hardhat node will start at `http://127.0.0.1:8545` (Chain ID: 31337).*
 
 ### 19.5 Step 4: Deploy Smart Contracts
+
+#### Option A: Deploy to Local Hardhat Node (Default)
 In a second terminal:
 ```bash
 cd member-1-blockchain-core
@@ -547,6 +549,14 @@ npx hardhat run scripts/deploy.js --network localhost
 *(Optional) Seed demo institution & issuer:*
 ```bash
 npx hardhat run scripts/setupDemo.js --network localhost
+```
+
+#### Option B: Deploy to Ethereum Sepolia Testnet (Optional)
+1. Configure `SEPOLIA_RPC_URL` and `SEPOLIA_PRIVATE_KEY` in `member-1-blockchain-core/.env`.
+2. Ensure the deployer account has test ETH.
+3. Deploy:
+```bash
+npx hardhat run scripts/deploy.js --network sepolia
 ```
 
 ### 19.6 Step 5: Install Member 2 Dependencies & Configure Environment
@@ -591,17 +601,19 @@ npm run dev
 
 ## 20. Environment Variables
 
-| Variable | Description | Default (Local Dev) |
-| :--- | :--- | :--- |
-| `PORT` | Express server HTTP port | `3000` |
-| `RPC_URL` | EVM JSON-RPC provider endpoint | `http://127.0.0.1:8545` |
-| `PRIVATE_KEY` | Hardhat default Account #0 private key | `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80` |
-| `INSTITUTION_REGISTRY_ADDRESS` | Deployed `InstitutionRegistry` address | `0x5FbDB2315678afecb367f032d93F642f64180aa3` |
-| `CERTIFICATE_REGISTRY_ADDRESS` | Deployed `CertificateRegistry` address | `0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512` |
-| `DIGITAL_CREDENTIAL_ADDRESS` | Deployed `DigitalCredential` facade address | `0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0` |
-| `JWT_SECRET` | Secret key for signing and verifying JWTs | `supersecretjwtkey123` |
-| `ISSUER_USERNAME` | Demo administrative issuer login username | `admin` |
-| `ISSUER_PASSWORD` | Demo administrative issuer login password | `admin123` |
+| Variable | Description | Default (Local Dev) | Sepolia / Production |
+| :--- | :--- | :--- | :--- |
+| `PORT` | Express server HTTP port | `3000` | `3000` |
+| `RPC_URL` | EVM JSON-RPC provider endpoint | `http://127.0.0.1:8545` | `https://eth-sepolia.g.alchemy.com/v2/...` |
+| `PRIVATE_KEY` | Deployer / Default Account private key | Hardhat Account #0 | Server-side secure private key |
+| `SEPOLIA_RPC_URL` | Hardhat config Sepolia endpoint | `https://rpc.sepolia.org` | Configured via `.env` |
+| `SEPOLIA_PRIVATE_KEY` | Hardhat config Sepolia deployer key | None | Configured via `.env` (Never committed) |
+| `INSTITUTION_REGISTRY_ADDRESS` | Deployed `InstitutionRegistry` address | Local deployed address | Sepolia deployed address |
+| `CERTIFICATE_REGISTRY_ADDRESS` | Deployed `CertificateRegistry` address | Local deployed address | Sepolia deployed address |
+| `DIGITAL_CREDENTIAL_ADDRESS` | Deployed `DigitalCredential` facade address | Local deployed address | Sepolia deployed address |
+| `JWT_SECRET` | Secret key for signing and verifying JWTs | `supersecretjwtkey123` | High-entropy production secret |
+| `ISSUER_USERNAME` | Demo administrative issuer login username | `admin` | Production admin username |
+| `ISSUER_PASSWORD` | Demo administrative issuer login password | `admin123` | Production admin password |
 
 ---
 
@@ -656,14 +668,13 @@ npx hardhat test
 
 ---
 
-## 24. Current Limitations (v1.0.0)
+## 24. Network Scope & Implementation Characteristics
 
-- **Local Network Execution:** Configured for local Hardhat node (`http://127.0.0.1:8545`).
-- **No IPFS / Decentralized File Storage:** Raw PDFs are processed in memory and not stored on IPFS.
-- **No W3C Verifiable Credentials / DID:** Uses Ethereum addresses and custom string IDs.
-- **Single-Chain Architecture:** EVM-compatible without cross-chain bridges or Layer-2 rollups.
-- **No Native Mobile App:** Implemented as a responsive web application.
-- **No Automated Email / SMS Notifications:** Credentials are distributed manually or via QR code.
+- **Dual-Network Support:** Configured out-of-the-box for local Hardhat node (`http://127.0.0.1:8545`, Chain ID `31337`) with optional deployment to public Ethereum Sepolia testnet (`Chain ID: 11155111`).
+- **In-Memory Cryptographic Hash Anchor:** Raw PDFs are hashed in volatile RAM using SHA-256 and never stored directly on-chain or on disk.
+- **Credential Model:** Uses standard EVM cryptographic addresses, deterministic SHA-256 proofs, and string credential identifiers.
+- **EVM-Standard Multi-Contract Architecture:** `InstitutionRegistry`, `CertificateRegistry`, and `DigitalCredential` facade pattern.
+- **Web Application Ecosystem:** Institutional and verification portals built with React 19 / Vite and Express / HTML5.
 
 ---
 

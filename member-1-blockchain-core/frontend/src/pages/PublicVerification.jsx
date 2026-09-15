@@ -78,22 +78,17 @@ export default function PublicVerification({ theme, toggleTheme }) {
 
       const activeCertId = data.certificateId || certId.trim();
 
-      if (['VALID', 'TAMPERED', 'REVOKED', 'EXPIRED'].includes(statusText) && blockchainService.digitalCredential && activeCertId) {
+      if (['VALID', 'TAMPERED', 'REVOKED', 'EXPIRED'].includes(statusText) && activeCertId) {
         try {
-          const certRegAddress = await blockchainService.digitalCredential.certificateRegistry();
-          const certReg = new ethers.Contract(certRegAddress, [
-            "function certificates(string) view returns (string, string, address, uint256, uint8, uint256)"
-          ], blockchainService.provider);
-
-          const cert = await certReg.certificates(activeCertId);
-          if (cert && cert[0] === activeCertId) {
+          const cert = await blockchainService.getCertificate(activeCertId);
+          if (cert && (cert[7] ?? cert.exists)) {
             details = {
-              id: cert[0],
-              hash: cert[1],
-              issuer: cert[2],
-              expiry: cert[3].toString(),
-              status: cert[4],
-              version: cert[5].toString()
+              id: String(cert[0] || cert.certificateId || activeCertId),
+              hash: String(cert[1] || cert.certificateHash || ''),
+              issuer: String(cert[2] || cert.issuer || ''),
+              expiry: (cert[4] ?? cert.expiryTimestamp ?? 0).toString(),
+              status: Number(cert[5] ?? cert.status ?? 0),
+              version: (cert[6] ?? cert.version ?? 1).toString()
             };
           }
         } catch (err) {

@@ -221,6 +221,11 @@ export const revokeCertificate = async (req, res) => {
         const receipt = await tx.wait();
         const timestamp = new Date().toISOString();
 
+        const db = getDb();
+        if (db) {
+            db.run('UPDATE certificates SET status = ? WHERE id = ?', ['REVOKED', certificateId]);
+        }
+
         saveEventToDb({
             eventType: 'CertificateRevoked',
             certificateId,

@@ -1,37 +1,192 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Shield, LayoutDashboard, FileText, Building2, Users, Search, Activity, Settings as SettingsIcon, BarChart3, Copy, CheckCircle, Sun, Moon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { NavLink } from 'react-router-dom';
+import {
+  LayoutDashboard,
+  FileText,
+  Building2,
+  Users,
+  Search,
+  Activity,
+  Settings as SettingsIcon,
+  BarChart3,
+  Copy,
+  CheckCircle,
+  Sun,
+  Moon,
+  Shield
+} from 'lucide-react';
 import { Badge } from '../common/Components';
+import { blockchainService } from '../../services/blockchain';
 
-export function Sidebar() {
-  const navItems = [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Overview" },
-    { to: "/credentials", icon: FileText, label: "Credentials" },
-    { to: "/institutions", icon: Building2, label: "Institutions" },
-    { to: "/issuers", icon: Users, label: "Issuers" },
-    { to: "/verification", icon: Search, label: "Verification" },
-    { to: "/analytics", icon: BarChart3, label: "Analytics" },
-    { to: "/activity", icon: Activity, label: "Audit Trail" },
-    { to: "/settings", icon: SettingsIcon, label: "Settings" }
+function CredChainLogoMark({ size = 20 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="brand-logo-mark"
+      aria-hidden="true"
+    >
+      {/* Upper-left credential anchor node */}
+      <rect
+        x="3.5"
+        y="3.5"
+        width="7"
+        height="7"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      {/* Lower-right verification block node */}
+      <rect
+        x="13.5"
+        y="13.5"
+        width="7"
+        height="7"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      {/* Cryptographic consensus link paths */}
+      <path
+        d="M7 10.5V14.25C7 15.49 8.01 16.5 9.25 16.5H13.5"
+        stroke="var(--sidebar-accent)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M17 13.5V9.75C17 8.51 15.99 7.5 14.75 7.5H10.5"
+        stroke="var(--sidebar-accent)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Micro-nodes */}
+      <circle cx="7" cy="7" r="1.25" fill="var(--sidebar-accent)" />
+      <circle cx="17" cy="17" r="1.25" fill="var(--sidebar-accent)" />
+    </svg>
+  );
+}
+
+export function Sidebar({ network }) {
+  const [chainInfo, setChainInfo] = useState({
+    name: network || 'Hardhat Local',
+    chainId: 31337,
+    status: 'connected'
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchNetworkDetails() {
+      try {
+        if (blockchainService && blockchainService.provider) {
+          const net = await blockchainService.provider.getNetwork();
+          if (isMounted && net) {
+            const id = Number(net.chainId);
+            const friendlyName =
+              id === 31337 ? 'Hardhat Node' :
+              id === 1 ? 'Ethereum Mainnet' :
+              id === 11155111 ? 'Sepolia Testnet' :
+              id === 1337 ? 'Local Geth' : (network || 'Local Node');
+            setChainInfo({
+              name: network || friendlyName,
+              chainId: id,
+              status: 'connected'
+            });
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          setChainInfo({
+            name: network || 'Local Development',
+            chainId: 31337,
+            status: 'connected'
+          });
+        }
+      }
+    }
+    fetchNetworkDetails();
+    return () => { isMounted = false; };
+  }, [network]);
+
+  const navGroups = [
+    {
+      group: "WORKSPACE",
+      items: [
+        { to: "/dashboard", icon: LayoutDashboard, label: "Overview" },
+        { to: "/credentials", icon: FileText, label: "Credentials" },
+        { to: "/verification", icon: Search, label: "Verification" }
+      ]
+    },
+    {
+      group: "INSTITUTIONS",
+      items: [
+        { to: "/institutions", icon: Building2, label: "Institutions" },
+        { to: "/issuers", icon: Users, label: "Issuers" }
+      ]
+    },
+    {
+      group: "INTELLIGENCE",
+      items: [
+        { to: "/analytics", icon: BarChart3, label: "Analytics" },
+        { to: "/activity", icon: Activity, label: "Audit Trail" }
+      ]
+    },
+    {
+      group: "SYSTEM",
+      items: [
+        { to: "/settings", icon: SettingsIcon, label: "Settings" }
+      ]
+    }
   ];
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Main Navigation">
       <div className="sidebar-header">
-        <Shield size={24} color="var(--primary)" />
-        CredChain
+        <div className="brand-lockup">
+          <div className="brand-icon-wrapper">
+            <CredChainLogoMark size={20} />
+          </div>
+          <div className="brand-text-block">
+            <span className="brand-title">CredChain</span>
+            <span className="brand-badge">PROTOCOL</span>
+          </div>
+        </div>
       </div>
+
       <nav className="sidebar-nav">
-        {navItems.map((item, idx) => (
-          <NavLink key={idx} to={item.to} className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}>
-            <item.icon size={18} /> {item.label}
-          </NavLink>
+        {navGroups.map((section, sIdx) => (
+          <div key={sIdx} className="nav-section">
+            <div className="nav-section-title">{section.group}</div>
+            <div className="nav-section-items">
+              {section.items.map((item, idx) => (
+                <NavLink
+                  key={idx}
+                  to={item.to}
+                  className={({isActive}) => `nav-item ${isActive ? 'active' : ''}`}
+                >
+                  <item.icon className="nav-icon" size={18} strokeWidth={1.8} />
+                  <span className="nav-label">{item.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
+
       <div className="sidebar-footer">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
-          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--success)' }}></div>
-          <span style={{ color: 'var(--text-muted)' }}>Local Development</span>
+        <div className="network-status-widget">
+          <div className="status-header">
+            <span className="status-indicator"></span>
+            <span className="status-title">Local Development</span>
+          </div>
+          <div className="status-details">
+            <span className="network-name">{chainInfo.name}</span>
+            <span className="chain-pill">Chain {chainInfo.chainId}</span>
+          </div>
         </div>
       </div>
     </aside>
@@ -52,9 +207,9 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
   return (
     <header className="header">
       <div className="header-left">
-        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.5rem 1rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '300px', border: '1px solid var(--border)' }}>
-          <Search size={16} style={{ marginRight: '0.5rem' }} />
-          <span style={{ fontSize: '0.9rem' }}>Global Search...</span>
+        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-main)', padding: '0.45rem 0.9rem', borderRadius: 'var(--radius-md)', color: 'var(--text-muted)', width: '320px', border: '1px solid var(--border)' }}>
+          <Search size={15} style={{ marginRight: '0.6rem', color: 'var(--text-muted)' }} />
+          <span style={{ fontSize: '0.85rem' }}>Search certificates, hashes, issuers...</span>
         </div>
       </div>
       <div className="header-right">
@@ -118,7 +273,7 @@ export function Header({ wallet, network, connect, theme, toggleTheme }) {
 export function AppShell({ children, wallet, network, connect, theme, toggleTheme }) {
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar network={network} />
       <div className="main-wrapper">
         <Header wallet={wallet} network={network} connect={connect} theme={theme} toggleTheme={toggleTheme} />
         <main className="main-content">

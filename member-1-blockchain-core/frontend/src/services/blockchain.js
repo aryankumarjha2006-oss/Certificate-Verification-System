@@ -6,7 +6,7 @@ import InstitutionRegistryABI from "../contracts/InstitutionRegistry.json";
 // Replace with the addresses deployed in your local node
 export const CONTRACT_ADDRESSES = {
   institutionRegistry: import.meta.env.VITE_INSTITUTION_REGISTRY_ADDRESS || "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-  digitalCredential: import.meta.env.VITE_DIGITAL_CREDENTIAL_ADDRESS || "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+  digitalCredential: import.meta.env.VITE_DIGITAL_CREDENTIAL_ADDRESS || "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9"
 };
 
 export function getInjectedEthereumProvider() {
@@ -79,6 +79,8 @@ class BlockchainService {
 
       if (chainId === 31337) {
         netName = "Hardhat Local";
+      } else if (chainId === 11155111) {
+        netName = "Ethereum Sepolia";
       } else if (chainId === 1) {
         netName = "Mainnet";
       } else if (chainId === 1337 || chainId === 1338) {
@@ -120,7 +122,7 @@ class BlockchainService {
   }
 
   async getAllRegisteredInstitutions() {
-    const candidateIds = new Set(['DEMO_INST_01', 'INST-001', 'INST-002', 'UNIV01']);
+    const candidateIds = new Set();
 
     // 1. Discover registered institutions from on-chain event logs
     try {
@@ -128,68 +130,71 @@ class BlockchainService {
       const regEvents = await contract.queryFilter(contract.filters.InstitutionRegistered(), 0, "latest");
       regEvents.forEach(e => {
         if (e.args && e.args[0]) {
-          const rawId = typeof e.args[0] === 'string' ? e.args[0] : String(e.args[0]);
-          if (!rawId.startsWith('0x') || rawId.length !== 66) {
+          const rawId = typeof e.args[0] === 'string' ? e.args[0] : (e.args[0].hash || '');
+          if (rawId && !rawId.startsWith('0x')) {
             candidateIds.add(rawId);
           }
         }
       });
     } catch(e) {}
 
-    // 2. Discover institutions from database records
+    // 2. Discover from off-chain database certificates
     try {
       const res = await fetch('http://localhost:3000/api/certificates');
       if (res.ok) {
         const certs = await res.json();
-        certs.forEach(c => { if (c.institutionId) candidateIds.add(c.institutionId); });
-      }
-    } catch(e) {}
-
-    try {
-      const aRes = await fetch('http://localhost:3000/api/audit/events?limit=100');
-      if (aRes.ok) {
-        const aData = await aRes.json();
-        (aData.events || []).forEach(ev => {
-          if (ev.institutionId && !ev.institutionId.startsWith('0x')) {
-            candidateIds.add(ev.institutionId);
+        certs.forEach(c => {
+          if (c.institutionId && !c.institutionId.startsWith('0x')) {
+            candidateIds.add(c.institutionId);
           }
         });
       }
     } catch(e) {}
 
-    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
-
-    const list = [];
-    for (const id of candidateIds) {
-      try {
-        const inst = await contract.getInstitution(id);
-        if (inst && (inst.exists || inst[4])) {
-          list.push({
-            id: String(inst.id || inst[0] || id),
-            name: String(inst.name || inst[1] || 'Unknown Institution'),
-            wallet: String(inst.wallet || inst[2] || '0x000'),
-            isActive: Boolean(inst.isActive ?? inst[3] ?? true)
+    // 3. Discover from off-chain analytics institutions endpoint
+    try {
+      const res = await fetch('http://localhost:3000/api/analytics/institutions');
+      if (res.ok) {
+        const instBreakdown = await res.json();
+        if (Array.isArray(instBreakdown)) {
+          instBreakdown.forEach(i => {
+            if (i.institutionId && !i.institutionId.startsWith('0x')) {
+              candidateIds.add(i.institutionId);
+            }
           });
         }
-      } catch(e) {}
+      }
+    } catch(e) {}
+
+    const list = [];
+    const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
+
+    for (const instId of candidateIds) {
+      try {
+        const inst = await contract.getInstitution(instId);
+        if (inst && (inst[3] !== undefined || inst.isActive !== undefined)) {
+          const isActive = Boolean(inst[3] ?? inst.isActive);
+          list.push({
+            id: String(inst[0] || instId),
+            name: String(inst[1] || inst.name || instId),
+            wallet: String(inst[2] || inst.institutionWallet || ''),
+            isActive
+          });
+        }
+      } catch (err) {}
     }
+
     return list;
   }
 
   async getAllAuthorizedIssuers() {
     const institutions = await this.getAllRegisteredInstitutions();
     const contract = this.institutionRegistry || new ethers.Contract(CONTRACT_ADDRESSES.institutionRegistry, InstitutionRegistryABI.abi, this.provider);
-
-    const candidateWallets = new Set([
-      '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
-      '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-      '0x3C44CdD459693451D78155437276156522617737',
-      '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
-    ]);
+    const candidateWallets = new Set();
 
     // Discover authorized issuer wallets from institution admin wallets and on-chain events
     institutions.forEach(inst => {
-      if (inst.wallet && inst.wallet !== '0x000') {
+      if (inst.wallet && inst.wallet !== '0x0000000000000000000000000000000000000000' && inst.wallet !== '0x000') {
         candidateWallets.add(inst.wallet);
       }
     });

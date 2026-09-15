@@ -1,21 +1,31 @@
 :root {
-  /* Colors - Light Theme (Premium Enterprise) */
+  /* Colors - Light Theme (Premium Enterprise Infrastructure) */
   --bg-main: #f8fafc;
   --bg-card: #ffffff;
-  --bg-sidebar: #0f172a; /* Deep Navy */
+
+  /* Sidebar - Light Mode */
+  --bg-sidebar: #f8fafc;
+  --bg-sidebar-surface: #ffffff;
+  --bg-sidebar-hover: #f1f5f9;
+  --bg-sidebar-active: #ffffff;
+  --border-sidebar: #e2e8f0;
+  --text-sidebar: #475569;
+  --text-sidebar-muted: #94a3b8;
+  --text-sidebar-title: #0f172a;
+  --text-sidebar-active: #0f172a;
+  --sidebar-accent: #2563eb;
+  --sidebar-active-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
 
   --text-main: #0f172a;
   --text-muted: #64748b;
-  --text-sidebar: #cbd5e1;
-  --text-sidebar-title: #ffffff;
   --text-inverse: #ffffff;
 
-  --primary: #0f172a; /* Deep Navy */
+  --primary: #0f172a; /* Deep Charcoal */
   --primary-hover: #1e293b;
   --secondary: #2563eb; /* Professional Blue */
   --secondary-hover: #1d4ed8;
 
-  --accent: #0284c7; /* Professional Cyan/Blue */
+  --accent: #0284c7;
   --accent-light: #e0f2fe;
   --accent-text: #0369a1;
   --accent-border: #bae6fd;
@@ -57,19 +67,29 @@
 
   /* Transitions */
   --transition-fast: 0.15s ease-in-out;
-  --transition-normal: 0.3s ease-in-out;
+  --transition-normal: 0.25s ease-in-out;
 }
 
 [data-theme="dark"] {
   /* Refined Neutral Charcoal / Graphite Dark Theme */
   --bg-main: #0F1115;
   --bg-card: #15181D;
-  --bg-sidebar: #15181D;
+
+  /* Sidebar - Dark Mode */
+  --bg-sidebar: #111419;
+  --bg-sidebar-surface: #15181d;
+  --bg-sidebar-hover: #191d24;
+  --bg-sidebar-active: #181c22;
+  --border-sidebar: #222730;
+  --text-sidebar: #9ca3af;
+  --text-sidebar-muted: #6b7280;
+  --text-sidebar-title: #f3f4f6;
+  --text-sidebar-active: #ffffff;
+  --sidebar-accent: #38bdf8;
+  --sidebar-active-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.5);
 
   --text-main: #F3F4F6;
   --text-muted: #A7ADB7;
-  --text-sidebar: #A7ADB7;
-  --text-sidebar-title: #F3F4F6;
   --text-inverse: #0F1115;
 
   --primary: #F3F4F6;
@@ -77,9 +97,9 @@
   --secondary: #3B82F6;
   --secondary-hover: #2563EB;
 
-  --accent: #38BDF8; /* Bright Sky Blue for Dark Theme Icons/Accents */
-  --accent-light: rgba(56, 189, 248, 0.16); /* Translucent Blue Surface */
-  --accent-text: #38BDF8; /* High-Contrast Sky Blue Text */
+  --accent: #38BDF8;
+  --accent-light: rgba(56, 189, 248, 0.16);
+  --accent-text: #38BDF8;
   --accent-border: rgba(56, 189, 248, 0.3);
 
   --info: #38BDF8;

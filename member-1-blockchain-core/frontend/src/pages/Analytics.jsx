@@ -4,7 +4,7 @@ import { Card, StatCard, Badge } from '../components/common/Components';
 import { LoadingState, ErrorState, EmptyState } from '../components/common/UIStates';
 import {
   BarChart3, Activity, Users, FileText, CheckCircle, XCircle,
-  AlertTriangle, ShieldCheck, Building2, TrendingUp, Search
+  AlertTriangle, ShieldCheck, Building2, TrendingUp, Search, RefreshCw
 } from 'lucide-react';
 import { blockchainService } from '../services/blockchain';
 
@@ -37,6 +37,7 @@ export default function Analytics() {
   });
 
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export default function Analytics() {
       let token = await getAuthToken();
       let headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-      // Fetch summary
+      // Fetch summary and trend datasets
       let [sumRes, issueTrendRes, verifyTrendRes, resultsRes, instRes, activityRes] = await Promise.allSettled([
         fetch('http://localhost:3000/api/analytics/summary', { headers }),
         fetch('http://localhost:3000/api/analytics/issuance-trends', { headers }),
@@ -142,7 +143,7 @@ export default function Analytics() {
         });
       }
 
-      // If backend was not reached or returned empty, fallback to contract logs directly
+      // If backend was not reached or returned empty, fallback to contract state
       if (!backendOk && blockchainService.provider) {
         await loadContractFallback();
       }
@@ -156,7 +157,13 @@ export default function Analytics() {
       }
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    await loadAnalytics();
   };
 
   const loadContractFallback = async () => {
@@ -188,19 +195,24 @@ export default function Analytics() {
         return String(val ?? '');
       };
 
-      const uniqueInsts = new Set(eInsts.map(e => parseArg(e.args[0]))).size;
+      const uniqueInsts = new Set(eInsts.map(e => parseArg(e.args[0])).filter(Boolean)).size;
       const uniqueIssuers = new Set(eIssuers.map(e => `${parseArg(e.args[0])}-${parseArg(e.args[1])}`)).size;
-      const uniqueIssued = new Set(eIssued.map(e => parseArg(e.args[0]))).size;
-      const uniqueRevoked = new Set(eRevoked.map(e => parseArg(e.args[0]))).size;
+
+      // Discover credentials from blockchainService
+      const credentials = await blockchainService.getCredentials();
+      const uniqueIssued = credentials.length;
+      const activeCount = credentials.filter(c => c.status === 'ACTIVE').length;
+      const revokedCount = credentials.filter(c => c.status === 'REVOKED').length;
+      const expiredCount = credentials.filter(c => c.status === 'EXPIRED').length;
 
       const recentIssued = eIssued.sort((a,b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 5);
       const recentRevoked = eRevoked.sort((a,b) => Number(b.blockNumber) - Number(a.blockNumber)).slice(0, 5);
 
       setSummary({
         totalIssued: uniqueIssued,
-        activeCertificates: Math.max(0, uniqueIssued - uniqueRevoked),
-        totalRevoked: uniqueRevoked,
-        totalExpired: 0,
+        activeCertificates: activeCount,
+        totalRevoked: revokedCount,
+        totalExpired: expiredCount,
         totalInstitutions: uniqueInsts,
         totalIssuers: uniqueIssuers,
         totalVerifications: 0,
@@ -230,7 +242,7 @@ export default function Analytics() {
     if (!data || data.length === 0) {
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-main)', borderRadius: 'var(--radius-md)' }}>
-          No {title.toLowerCase()} data available yet.
+          No {title.toLowerCase()} data recorded yet.
         </div>
       );
     }
@@ -269,17 +281,27 @@ export default function Analytics() {
 
   return (
     <div>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h1 className="page-title">Platform Analytics</h1>
           <p className="page-subtitle">Real-time lifecycle & verification metrics derived from blockchain events and SQLite audit logs.</p>
         </div>
-        <div>
-          <Badge type="primary">Source: Blockchain & Indexer</Badge>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing || loading}
+            className="btn btn-secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', padding: '0.4rem 0.8rem', cursor: 'pointer' }}
+            title="Refresh analytics from blockchain and backend database"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} />
+            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <Badge type="primary">Source: Blockchain & Persistent DB</Badge>
         </div>
       </div>
 
-      {loading ? (
+      {loading && !isRefreshing ? (
         <LoadingState message="Aggregating blockchain events and verification metrics..." />
       ) : error ? (
         <ErrorState title="Failed to Load Analytics" message={error} onRetry={loadAnalytics} />
@@ -362,7 +384,7 @@ export default function Analytics() {
             <Card title={<div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Building2 size={18}/> Credentials by Institution</div>}>
               {institutions.length === 0 ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 0' }}>
-                  No institution data available.
+                  No institution data recorded yet.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
