@@ -11,6 +11,7 @@ import CredentialDetails from './pages/CredentialDetails';
 import Analytics from './pages/Analytics';
 import Issuers from './pages/Issuers';
 import Verification from './pages/Verification';
+import TechnologyStack from './pages/TechnologyStack';
 import Settings from './pages/Settings';
 import BlockchainLoader from './components/common/BlockchainLoader';
 import btcCoin from './assets/bitcoin-coin.jpg';
@@ -111,6 +112,7 @@ function App() {
               <Route path="/activity" element={<BlockchainActivityPage />} />
               <Route path="/issuers" element={<Issuers />} />
               <Route path="/verification" element={<Verification />} />
+              <Route path="/tech-stack" element={<TechnologyStack />} />
               <Route path="/settings" element={<Settings network={network} />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
@@ -122,3 +124,4 @@ function App() {
 }
 
 export default App;
+

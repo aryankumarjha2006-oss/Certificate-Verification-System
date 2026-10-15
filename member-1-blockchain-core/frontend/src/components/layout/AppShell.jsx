@@ -13,7 +13,8 @@ import {
   CheckCircle,
   Sun,
   Moon,
-  Shield
+  Shield,
+  Cpu
 } from 'lucide-react';
 import { Badge } from '../common/Components';
 import { blockchainService } from '../../services/blockchain';
@@ -138,6 +139,7 @@ export function Sidebar({ network }) {
     {
       group: "SYSTEM",
       items: [
+        { to: "/tech-stack", icon: Cpu, label: "Tech Stack" },
         { to: "/settings", icon: SettingsIcon, label: "Settings" }
       ]
     }

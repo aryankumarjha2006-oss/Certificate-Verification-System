@@ -10,3 +10,4 @@ typechain/
 typechain-types/
 .DS_Store
 scratch/
+*.log
